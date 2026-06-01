@@ -495,6 +495,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 12px;
     padding: 6px 12px;
     background: rgba(255, 137, 6, 0.06);
     border-left: 2px solid var(--accent);
@@ -506,11 +507,22 @@
     font-weight: 600;
   }
 
+  .winner-row .winner-names-group {
+    color: var(--ink);
+    font-weight: 600;
+    line-height: 1.4;
+    flex: 1;
+    min-width: 0;
+    word-wrap: break-word;
+  }
+
   .winner-row .winner-month {
     color: var(--muted);
     font-size: 10px;
     text-transform: uppercase;
     letter-spacing: 0.1em;
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .winners-empty {
@@ -1073,7 +1085,7 @@
 
     <footer>
       <span id="syncStatus">● connecting…</span>
-      <span>v2.3 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
+      <span>v2.4 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
     </footer>
   </div>
 
@@ -1141,8 +1153,8 @@
   //    anyone can do is mess with this one bin. Don't reuse this key
   //    for anything sensitive.
   // ===========================================================
-  const JSONBIN_API_KEY = '$2a$10$KeF8Uy3NzHm59Ax597obje8FKeaxaAQmO7Z3Fd3yPJ2KgocUBtUKq';
-  const JSONBIN_BIN_ID  = '6a1d9b88ddf5aa59f7805794';
+  const JSONBIN_API_KEY = 'PASTE_YOUR_X_MASTER_KEY_HERE';
+  const JSONBIN_BIN_ID  = 'PASTE_YOUR_BIN_ID_HERE';
 
   const CLOUD_ENABLED = !JSONBIN_API_KEY.startsWith('PASTE_') && !JSONBIN_BIN_ID.startsWith('PASTE_');
   const STORAGE_KEY = 'theDecider.v2';
@@ -1870,21 +1882,32 @@
     }
     const total = history.length;
     const drawsPerMonth = getDrawsPerMonth();
-    // Show oldest first (M1 → latest)
+
+    // Group oldest-first by cycle month
     const ordered = [...history].reverse();
-    const rows = ordered.map((entry, i) => {
+    const groups = new Map(); // cycleMonth → { names, time }
+    ordered.forEach((entry, i) => {
       const name = typeof entry === 'string' ? entry : entry.name;
       const time = typeof entry === 'string' ? null : entry.time;
       const drawNum = i + 1;
       const cycleMonth = Math.ceil(drawNum / drawsPerMonth);
-      const monthLabel = time
-        ? `M${cycleMonth} · ${formatMonthYear(time)}`
+      if (!groups.has(cycleMonth)) {
+        groups.set(cycleMonth, { names: [], time });
+      }
+      groups.get(cycleMonth).names.push(name);
+    });
+
+    const rows = [...groups.entries()].map(([cycleMonth, group]) => {
+      const monthLabel = group.time
+        ? `M${cycleMonth} · ${formatMonthYear(group.time)}`
         : `M${cycleMonth}`;
+      const namesHtml = group.names.map(n => `<span class="winner-name">${escapeHtml(n)}</span>`).join(', ');
       return `<div class="winner-row">
-        <span class="winner-name">${escapeHtml(name)}</span>
+        <span class="winner-names-group">${namesHtml}</span>
         <span class="winner-month">${monthLabel}</span>
       </div>`;
     }).join('');
+
     el.innerHTML = `
       <div class="winners-so-far-title">Winners so far (${total})</div>
       <div class="winners-list">${rows}</div>
@@ -1900,20 +1923,35 @@
     }
     const drawsPerMonth = getDrawsPerMonth();
     const total = history.length;
-    historyList.innerHTML = history.slice(0, 50)
-      .map((entry, displayIdx) => {
-        const name = typeof entry === 'string' ? entry : entry.name;
-        const time = typeof entry === 'string' ? null : entry.time;
-        // history[0] is newest. drawNum from oldest = total - displayIdx.
-        // Cycle month number = ceil(drawNum / drawsPerMonth)
-        const drawNum = total - displayIdx;
-        const cycleMonth = Math.ceil(drawNum / drawsPerMonth);
-        const dateLabel = time
-          ? `<span class="history-date">M${cycleMonth} · ${formatMonthYear(time)}</span>`
-          : `<span class="history-date">M${cycleMonth}</span>`;
-        return `<span class="history-item">${escapeHtml(name)}${dateLabel}</span>`;
-      })
-      .join('');
+
+    // Group entries by cycle month. Newest cycle month first.
+    // history[0] is newest, so iterate and compute drawNum from oldest.
+    // We want to display newest cycle months first.
+    const groupsMap = new Map(); // cycleMonth → { names, time }
+    history.forEach((entry, idx) => {
+      // idx 0 = newest = highest drawNum
+      const drawNum = total - idx;
+      const cycleMonth = Math.ceil(drawNum / drawsPerMonth);
+      const name = typeof entry === 'string' ? entry : entry.name;
+      const time = typeof entry === 'string' ? null : entry.time;
+      if (!groupsMap.has(cycleMonth)) {
+        groupsMap.set(cycleMonth, { names: [], time });
+      }
+      // Insert at start so oldest-drawn-in-month comes first within the chip
+      groupsMap.get(cycleMonth).names.unshift(name);
+    });
+
+    // Sort: newest cycle month first
+    const sortedGroups = [...groupsMap.entries()].sort((a, b) => b[0] - a[0]);
+
+    historyList.innerHTML = sortedGroups.slice(0, 20).map(([cycleMonth, group]) => {
+      const dateLabel = group.time
+        ? `<span class="history-date">M${cycleMonth} · ${formatMonthYear(group.time)}</span>`
+        : `<span class="history-date">M${cycleMonth}</span>`;
+      const namesHtml = group.names.map(n => escapeHtml(n)).join(', ');
+      return `<span class="history-item">${namesHtml}${dateLabel}</span>`;
+    }).join('');
+
     updateStats();
     renderWinnersSoFar();
   }
