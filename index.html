@@ -196,6 +196,7 @@
     color: var(--muted);
     white-space: nowrap;
   }
+
   /* Mobile: shrink stats and distribute evenly so all 3 fit on one row */
   @media (max-width: 520px) {
     .stats-row {
@@ -687,6 +688,29 @@
   .spin-btn:active { transform: translate(3px, 3px); box-shadow: 3px 3px 0 var(--accent-3); }
   .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  .undo-btn {
+    margin-top: 14px;
+    background: transparent;
+    border: 1px dashed var(--muted);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 8px 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+    align-self: center;
+  }
+
+  .undo-btn:hover {
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+    border-style: solid;
+  }
+
+  .undo-btn[hidden] { display: none; }
+
   /* Controls */
   .controls {
     margin-top: 24px;
@@ -1089,6 +1113,8 @@
 
         <button class="spin-btn" id="spinBtn">Draw Winner</button>
 
+        <button class="undo-btn" id="undoBtn" hidden>↩ Undo last draw</button>
+
         <div class="history">
           <div class="history-title">
             <span>Payout Ledger</span>
@@ -1103,7 +1129,7 @@
 
     <footer>
       <span id="syncStatus">● connecting…</span>
-      <span>v2.5 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
+      <span>v2.7 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
     </footer>
   </div>
 
@@ -1171,8 +1197,8 @@
   //    anyone can do is mess with this one bin. Don't reuse this key
   //    for anything sensitive.
   // ===========================================================
-  const JSONBIN_API_KEY = '$2a$10$KeF8Uy3NzHm59Ax597obje8FKeaxaAQmO7Z3Fd3yPJ2KgocUBtUKq';
-  const JSONBIN_BIN_ID  = '6a1d9b88ddf5aa59f7805794';
+  const JSONBIN_API_KEY = 'PASTE_YOUR_X_MASTER_KEY_HERE';
+  const JSONBIN_BIN_ID  = 'PASTE_YOUR_BIN_ID_HERE';
 
   const CLOUD_ENABLED = !JSONBIN_API_KEY.startsWith('PASTE_') && !JSONBIN_BIN_ID.startsWith('PASTE_');
   const STORAGE_KEY = 'theDecider.v2';
@@ -1741,6 +1767,7 @@
       resultLabel.textContent = 'Ready to draw';
       spinBtn.disabled = false;
       saveState();
+      hideUndoButton?.();
     }
 
     modal.hidden = true;
@@ -1980,22 +2007,26 @@
 
     const drawsPerMonth = getDrawsPerMonth();
     const alreadyDrawnThisMonth = drawsThisCalendarMonth();
+    const quotaMet = alreadyDrawnThisMonth >= drawsPerMonth;
 
     // Guard: if quota already met for this calendar month, ask for override
-    if (alreadyDrawnThisMonth >= drawsPerMonth) {
+    if (quotaMet) {
       const thisMonth = history.filter(e => e.time && getEntryMonthKey(e.time) === getCurrentMonthKey());
       const winnersThisMonth = thisMonth.map(e => e.name).join(', ');
       const ok = confirm(
         `This month's draws are complete:\n${winnersThisMonth}\n\n` +
         `(${drawsPerMonth} ${drawsPerMonth === 1 ? 'draw' : 'draws'} per month)\n\n` +
-        `Draw extra anyway?`
+        `Draw next month's ${drawsPerMonth === 1 ? 'winner' : drawsPerMonth + ' winners'} anyway?`
       );
       if (!ok) return;
     }
 
-    // How many draws are needed RIGHT NOW (the remaining draws for this calendar month).
-    // If quota already met, the user override case = 1 extra.
-    let drawsRemaining = Math.max(1, drawsPerMonth - alreadyDrawnThisMonth);
+    // How many draws to do now:
+    //  - If quota not yet met: fill the remainder
+    //  - If quota already met (overriding): do a full next-month batch
+    let drawsRemaining = quotaMet
+      ? drawsPerMonth
+      : drawsPerMonth - alreadyDrawnThisMonth;
 
     // Pool = active names (not skipping)
     let pool = names.filter(n => !skipping.has(n));
@@ -2054,6 +2085,8 @@
         }
         saveState();
         spinning = false;
+        // Show undo for this batch of draws
+        showUndoButton(monthWinners.length);
       }, 1200);
       return;
     }
@@ -2126,6 +2159,66 @@
   }
 
   spinBtn.addEventListener('click', spin);
+
+  // ===========================================================
+  // ↩ Undo last draw — for accidental clicks
+  // ===========================================================
+  const undoBtn = document.getElementById('undoBtn');
+  let undoHideTimer = null;
+
+  function showUndoButton(drawCount) {
+    if (!undoBtn) return;
+    undoBtn.textContent = drawCount > 1
+      ? `↩ Undo last ${drawCount} draws`
+      : '↩ Undo last draw';
+    undoBtn.dataset.count = drawCount;
+    undoBtn.hidden = false;
+
+    // Auto-hide after 60 seconds so old draws aren't accidentally undone later
+    if (undoHideTimer) clearTimeout(undoHideTimer);
+    undoHideTimer = setTimeout(() => {
+      undoBtn.hidden = true;
+    }, 60000);
+  }
+
+  function hideUndoButton() {
+    if (undoHideTimer) clearTimeout(undoHideTimer);
+    if (undoBtn) undoBtn.hidden = true;
+  }
+
+  undoBtn?.addEventListener('click', () => {
+    const count = parseInt(undoBtn.dataset.count || '1', 10);
+    if (history.length === 0) {
+      hideUndoButton();
+      return;
+    }
+    const ok = confirm(
+      `Undo the last ${count} ${count === 1 ? 'draw' : 'draws'}?\n\n` +
+      `${history.slice(0, count).map(e => e.name).join(', ')} will be returned to the pool.`
+    );
+    if (!ok) return;
+
+    // Remove the most recent `count` entries from history and restore those names
+    const undone = history.splice(0, count);
+    undone.forEach(entry => {
+      const name = typeof entry === 'string' ? entry : entry.name;
+      // Avoid duplicate if already in names somehow
+      if (!names.some(n => n.toLowerCase() === name.toLowerCase())) {
+        names.push(name);
+      }
+    });
+    skipping.clear();
+    renderNames();
+    renderHistory();
+    updateStats();
+    renderAmounts();
+    resultName.textContent = 'draw the lottery';
+    resultName.className = 'result-name idle';
+    resultLabel.textContent = 'Ready to draw';
+    spinBtn.disabled = false;
+    saveState();
+    hideUndoButton();
+  });
 
   // Keyboard: spacebar to spin
   document.addEventListener('keydown', e => {
