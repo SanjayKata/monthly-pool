@@ -3,6 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+<!-- Prevent aggressive caching so updates appear immediately -->
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="0" />
 <title>The Pool — Monthly Lottery</title>
 
 <!-- PWA: Install as app on phone/desktop -->
@@ -246,7 +251,7 @@
   }
 
   .name-chip {
-    cursor: default;
+    cursor: pointer;
   }
 
   .name-chip:hover {
@@ -254,9 +259,65 @@
     background: rgba(255, 137, 6, 0.08);
   }
 
+  .name-chip.skipping {
+    opacity: 0.55;
+    background: rgba(255, 255, 254, 0.02);
+    border-style: dashed;
+  }
+
+  .name-chip.skipping:hover {
+    opacity: 0.9;
+    border-color: var(--muted);
+    background: rgba(255, 255, 254, 0.06);
+  }
+
+  .skip-tag {
+    font-size: 8px;
+    letter-spacing: 0.1em;
+    color: var(--accent-2);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
   .name-chip .num {
     color: var(--muted);
     font-size: 10px;
+  }
+
+  .skip-banner {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 12px 14px;
+    margin-bottom: 12px;
+    background: rgba(242, 95, 76, 0.08);
+    border-left: 2px solid var(--accent-2);
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--ink);
+  }
+
+  .skip-banner[hidden] { display: none; }
+
+  .skip-banner-icon {
+    color: var(--accent-2);
+    font-size: 16px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+
+  .skip-banner-text strong {
+    color: var(--accent-2);
+    font-weight: 600;
+  }
+
+  .skip-banner-prize {
+    font-size: 11px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    display: inline-block;
+    margin-top: 4px;
   }
 
   .hint {
@@ -265,6 +326,147 @@
     letter-spacing: 0.2em;
     color: var(--muted);
     margin-bottom: 12px;
+  }
+
+  .panel-action {
+    position: absolute;
+    top: -8px;
+    right: 20px;
+    background: var(--bg);
+    padding: 0 10px;
+    z-index: 1;
+  }
+
+  .edit-link {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .edit-link:hover { color: var(--accent-2); }
+
+  .edit-panel[hidden] { display: none !important; }
+
+  .edit-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .edit-warning {
+    font-size: 11px;
+    color: var(--accent-2);
+    padding: 10px 12px;
+    background: rgba(242, 95, 76, 0.08);
+    border-left: 2px solid var(--accent-2);
+    line-height: 1.4;
+  }
+
+  .edit-warning:empty { display: none; }
+
+  .edit-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 320px;
+    overflow-y: auto;
+  }
+
+  .edit-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+  }
+
+  .edit-row input {
+    flex: 1;
+    background: rgba(255, 255, 254, 0.04);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+
+  .edit-row input:focus { border-color: var(--accent); }
+
+  .edit-row .remove-btn {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    width: 32px;
+    height: 32px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .edit-row .remove-btn:hover {
+    border-color: var(--accent-2);
+    color: var(--accent-2);
+  }
+
+  .edit-row.locked input {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .edit-row.locked .remove-btn {
+    visibility: hidden;
+  }
+
+  .edit-add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+
+  .edit-add-row input {
+    flex: 1;
+    background: rgba(255, 255, 254, 0.04);
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 8px 12px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+  }
+
+  .edit-add-row input:focus { border-color: var(--accent); }
+
+  .edit-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .edit-actions .btn-mini { flex: 1; }
+
+  .btn-save {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+  }
+
+  .btn-save:hover {
+    background: var(--bg);
+    color: var(--accent);
+  }
+
+  .btn-cancel {
+    border-color: var(--muted);
+    color: var(--muted);
   }
 
   .winners-so-far {
@@ -597,26 +799,159 @@
   @keyframes fadeIn {
     to { opacity: 1; transform: translateY(0); }
   }
+
+  /* Modal */
+  .modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 14, 23, 0.85);
+    backdrop-filter: blur(8px);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    animation: modalFade 0.2s ease-out;
+  }
+
+  .modal-backdrop[hidden] { display: none; }
+
+  @keyframes modalFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  .modal {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    max-width: 480px;
+    width: 100%;
+    padding: 32px;
+    position: relative;
+    animation: modalPop 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  @keyframes modalPop {
+    from { transform: scale(0.95); opacity: 0; }
+    to { transform: scale(1); opacity: 1; }
+  }
+
+  .modal-label {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: var(--bg);
+    padding: 0 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+  }
+
+  .modal-title {
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    margin-bottom: 12px;
+    color: var(--ink);
+  }
+
+  .modal-desc {
+    font-size: 13px;
+    color: var(--muted);
+    line-height: 1.5;
+    margin-bottom: 24px;
+  }
+
+  .modal-input-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 18px;
+    background: rgba(255, 137, 6, 0.06);
+    border: 1px solid var(--accent);
+    margin-bottom: 16px;
+  }
+
+  .modal-currency {
+    font-family: 'Fraunces', serif;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1;
+  }
+
+  .modal-input-row input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: var(--ink);
+    font-family: 'Fraunces', serif;
+    font-size: 32px;
+    font-weight: 700;
+    outline: none;
+    width: 100%;
+    min-width: 0;
+    /* Hide number spinners */
+    -moz-appearance: textfield;
+  }
+
+  .modal-input-row input::-webkit-outer-spin-button,
+  .modal-input-row input::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .modal-suffix {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-align: right;
+    line-height: 1.3;
+    max-width: 90px;
+  }
+
+  .modal-preview {
+    font-size: 14px;
+    color: var(--muted);
+    padding: 14px 16px;
+    background: rgba(255, 255, 254, 0.03);
+    border-left: 2px solid var(--accent);
+    margin-bottom: 28px;
+    line-height: 1.4;
+  }
+
+  .modal-preview strong { color: var(--ink); font-weight: 600; }
+
+  .modal-actions {
+    display: flex;
+    gap: 12px;
+  }
+
+  .modal-actions .btn-mini { flex: 1; padding: 14px; }
 </style>
 </head>
 <body>
   <div class="container">
     <div class="side-marks">
-      <span>POOL · ₹10K / MONTH</span>
+      <span id="sideMarkAmount">POOL · ₹10K / MONTH</span>
       <span>EST. 2026</span>
     </div>
 
     <header class="fade-in">
       <div class="logo">THE<span>•</span>POOL</div>
       <div class="meta">
-        <span>Monthly Lottery · ₹10,000 / month</span>
+        <span id="headerMeta">Monthly Lottery · ₹10,000 / month</span>
         <button id="installBtn" class="install-btn" hidden>↓ Install app</button>
       </div>
     </header>
 
     <div class="title-block fade-in">
       <h1>This month's <span class="italic">winner.</span></h1>
-      <p class="subtitle">
+      <p class="subtitle" id="subtitleText">
         10 friends, ₹1,000 each, every month. One name drawn,
         one person walks away with ₹10,000. Repeat until everyone has had their turn.
       </p>
@@ -634,10 +969,6 @@
           <span class="stat-num" id="statPaid">—</span>
           <span class="stat-label">Already paid out</span>
         </div>
-        <div class="stat">
-          <span class="stat-num">₹10K</span>
-          <span class="stat-label">Per month</span>
-        </div>
       </div>
     </div>
 
@@ -645,8 +976,24 @@
       <!-- Names panel -->
       <div class="panel fade-in">
         <div class="panel-label">Still in the pool</div>
-        <div class="hint">These people haven't received their ₹10,000 yet</div>
+        <button class="edit-link panel-action" id="editRosterBtn" title="Edit roster">edit roster</button>
+        <div class="hint" id="rosterHint">Click anyone who's paying but skipping this month's draw · <span style="color:var(--accent)">Tap to toggle</span></div>
+        <div class="skip-banner" id="skipBanner" hidden></div>
         <div class="names-grid" id="namesGrid"></div>
+
+        <!-- Edit roster panel (hidden by default) -->
+        <div class="edit-panel" id="editPanel" hidden>
+          <div class="edit-warning" id="editWarning"></div>
+          <div class="edit-list" id="editList"></div>
+          <div class="edit-add-row">
+            <input type="text" id="newNameInput" placeholder="Add new person..." maxlength="20" />
+            <button class="btn-mini" id="addNameBtn">+ Add</button>
+          </div>
+          <div class="edit-actions">
+            <button class="btn-mini btn-cancel" id="cancelEditBtn">Cancel</button>
+            <button class="btn-mini btn-save" id="saveEditBtn">Save Changes</button>
+          </div>
+        </div>
 
         <div class="winners-so-far" id="winnersSoFar"></div>
 
@@ -675,8 +1022,41 @@
 
     <footer>
       <span id="syncStatus">● connecting…</span>
-      <span>Open source · <a href="#">Fork on GitHub</a></span>
+      <span>v1.6 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
     </footer>
+  </div>
+
+  <!-- Cycle config modal -->
+  <div class="modal-backdrop" id="cycleModal" hidden>
+    <div class="modal">
+      <div class="modal-label">Start New Cycle</div>
+      <h2 class="modal-title">Set the monthly amount</h2>
+      <p class="modal-desc">
+        How much will each person contribute every month? This amount will be locked
+        for the entire cycle to keep things fair.
+      </p>
+
+      <div class="modal-input-row">
+        <span class="modal-currency">₹</span>
+        <input
+          type="number"
+          id="cycleAmount"
+          inputmode="numeric"
+          min="1"
+          max="1000000"
+          step="100"
+          value="1000"
+        />
+        <span class="modal-suffix">per person / month</span>
+      </div>
+
+      <div class="modal-preview" id="cyclePreview"></div>
+
+      <div class="modal-actions">
+        <button class="btn-mini btn-cancel" id="cycleModalCancel">Cancel</button>
+        <button class="btn-mini btn-save" id="cycleModalConfirm">Start Cycle</button>
+      </div>
+    </div>
   </div>
 
 <script>
@@ -684,6 +1064,7 @@
     "Jay", "Lavanya", "Payaswini", "Yamini", "Sunny",
     "Naveen", "Bala", "Ramya", "Rahul", "Sanjay"
   ];
+  const DEFAULT_PER_PERSON = 1000; // ₹ per person per month
 
   // ===========================================================
   // ☁️  CLOUD STORAGE — JSONBin.io
@@ -766,7 +1147,7 @@
   }
 
   function saveState() {
-    const state = { names, history };
+    const state = { names, history, skipping: [...skipping], perPerson };
     saveLocal(state);
     saveCloud(state);
   }
@@ -789,6 +1170,8 @@
   const cached = loadLocal();
   let names = cached?.names ?? [...DEFAULT_NAMES];
   let history = cached?.history ?? [];
+  let skipping = new Set(cached?.skipping ?? []);
+  let perPerson = cached?.perPerson ?? DEFAULT_PER_PERSON;
   let recentlyPicked = new Set();
   let spinning = false;
 
@@ -805,9 +1188,12 @@
       names = Array.isArray(cloud.names) && cloud.names.length > 0
         ? cloud.names : [...DEFAULT_NAMES];
       history = cloud.history;
-      saveLocal({ names, history });
+      skipping = new Set(Array.isArray(cloud.skipping) ? cloud.skipping : []);
+      perPerson = typeof cloud.perPerson === 'number' ? cloud.perPerson : DEFAULT_PER_PERSON;
+      saveLocal({ names, history, skipping: [...skipping], perPerson });
       renderNames();
       renderHistory();
+      renderAmounts();
       if (names.length === 0) {
         resultLabel.textContent = 'Roster empty — reset to play again';
         spinBtn.disabled = true;
@@ -824,14 +1210,17 @@
       if (spinning) return; // don't refresh mid-spin
       const cloud = await loadCloud();
       if (!cloud) return;
-      const cloudStr = JSON.stringify(cloud);
-      const localStr = JSON.stringify({ names, history });
+      const cloudStr = JSON.stringify({ names: cloud.names, history: cloud.history, skipping: cloud.skipping ?? [], perPerson: cloud.perPerson });
+      const localStr = JSON.stringify({ names, history, skipping: [...skipping], perPerson });
       if (cloudStr !== localStr && Array.isArray(cloud.history)) {
         names = cloud.names ?? names;
         history = cloud.history;
-        saveLocal({ names, history });
+        skipping = new Set(Array.isArray(cloud.skipping) ? cloud.skipping : []);
+        perPerson = typeof cloud.perPerson === 'number' ? cloud.perPerson : perPerson;
+        saveLocal({ names, history, skipping: [...skipping], perPerson });
         renderNames();
         renderHistory();
+        renderAmounts();
       }
     }, 15000);
   }
@@ -848,33 +1237,283 @@
     names.forEach((name, i) => {
       const chip = document.createElement('div');
       chip.className = 'name-chip';
+      if (skipping.has(name)) chip.classList.add('skipping');
       chip.dataset.name = name;
-      chip.innerHTML = `<span>${escapeHtml(name)}</span><span class="num">${String(i+1).padStart(2,'0')}</span>`;
+      const statusLabel = skipping.has(name)
+        ? '<span class="skip-tag">PAID · NOT IN DRAW</span>'
+        : `<span class="num">${String(i+1).padStart(2,'0')}</span>`;
+      chip.innerHTML = `<span>${escapeHtml(name)}</span>${statusLabel}`;
+      chip.title = skipping.has(name)
+        ? `Paid this month but opted out of the draw — click to rejoin draw`
+        : `Click to opt out of this month's draw (still pays ${formatINR(perPerson)})`;
+      chip.addEventListener('click', () => toggleSkip(name));
       namesGrid.appendChild(chip);
     });
+    updateSkipBanner();
+  }
+
+  function toggleSkip(name) {
+    if (skipping.has(name)) {
+      skipping.delete(name);
+    } else {
+      // Don't allow everyone to skip
+      if (skipping.size >= names.length - 1) {
+        alert('At least 2 people must participate in the draw.');
+        return;
+      }
+      skipping.add(name);
+    }
+    renderNames();
+    saveState();
+  }
+
+  function updateSkipBanner() {
+    const banner = document.getElementById('skipBanner');
+    if (!banner) return;
+    const skipCount = skipping.size;
+    if (skipCount === 0) {
+      banner.hidden = true;
+      return;
+    }
+    const eligibleCount = names.length - skipCount;
+    const totalPool = (history.length + names.length);
+    const monthlyPrize = totalPool * perPerson;
+    const skippers = [...skipping].join(', ');
+    banner.hidden = false;
+    banner.innerHTML = `
+      <span class="skip-banner-icon">⏸</span>
+      <div class="skip-banner-text">
+        <strong>${skipCount} opting out of this month's draw:</strong> ${escapeHtml(skippers)}<br>
+        <span class="skip-banner-prize">Everyone still pays ${formatINR(perPerson)} · Prize is still ${formatINR(monthlyPrize)} · ${eligibleCount} eligible to win this month</span>
+      </div>
+    `;
   }
 
   function escapeHtml(s) {
     return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   }
 
+  // ===========================================================
+  // ✏️  EDIT ROSTER — only allowed between cycles
+  // ===========================================================
+  const editRosterBtn = document.getElementById('editRosterBtn');
+  const editPanel = document.getElementById('editPanel');
+  const editList = document.getElementById('editList');
+  const editWarning = document.getElementById('editWarning');
+  const newNameInput = document.getElementById('newNameInput');
+  const addNameBtn = document.getElementById('addNameBtn');
+  const cancelEditBtn = document.getElementById('cancelEditBtn');
+  const saveEditBtn = document.getElementById('saveEditBtn');
+  const namesGridEl = document.getElementById('namesGrid');
+
+  let draftNames = []; // working copy while editing
+
+  function openEditor() {
+    // Build the draft: include everyone still in pool + warning for past winners
+    draftNames = [...names];
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    const cycleInProgress = history.length > 0 && names.length > 0;
+
+    if (cycleInProgress) {
+      editWarning.innerHTML =
+        '⚠️ <strong>Cycle in progress.</strong> ' +
+        `${history.length} ${history.length === 1 ? 'person has' : 'people have'} already won this cycle. ` +
+        'To preserve fairness, past winners stay locked and the current pool can only be edited carefully. ' +
+        'For best results, finish this cycle first and edit on the new cycle.';
+    } else {
+      editWarning.innerHTML = '';
+    }
+
+    renderEditList();
+    editPanel.hidden = false;
+    namesGridEl.style.display = 'none';
+    editRosterBtn.hidden = true;
+    newNameInput.focus();
+  }
+
+  function closeEditor(save) {
+    if (save) {
+      // Validate: no duplicates, no empty, at least 2 people
+      const cleaned = draftNames.map(n => n.trim()).filter(n => n.length > 0);
+      const unique = [...new Set(cleaned)];
+
+      if (unique.length !== cleaned.length) {
+        alert('Duplicate names found. Each person must have a unique name.');
+        return;
+      }
+      if (unique.length < 2) {
+        alert('Need at least 2 people in the pool.');
+        return;
+      }
+
+      // Make sure past winners are still represented (they're locked)
+      const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+      const missingWinners = winnerNames.filter(w => !unique.includes(w));
+      if (missingWinners.length > 0) {
+        alert(
+          `Cannot remove past winners: ${missingWinners.join(', ')}.\n\n` +
+          'These names must remain so the payout ledger stays accurate.'
+        );
+        return;
+      }
+
+      // The new "still in pool" = unique names that haven't won yet
+      names = unique.filter(n => !winnerNames.includes(n));
+      renderNames();
+      renderHistory();
+      saveState();
+    }
+
+    editPanel.hidden = true;
+    namesGridEl.style.display = '';
+    editRosterBtn.hidden = false;
+    newNameInput.value = '';
+  }
+
+  function renderEditList() {
+    const winnerNames = new Set(history.map(e => typeof e === 'string' ? e : e.name));
+    editList.innerHTML = '';
+
+    // Show winners first (locked), then current pool (editable)
+    const lockedRows = [...winnerNames].map(name => {
+      const row = document.createElement('div');
+      row.className = 'edit-row locked';
+      row.innerHTML = `
+        <input type="text" value="${escapeHtml(name)}" disabled />
+        <button class="remove-btn" title="Past winner — locked">✓</button>
+      `;
+      return row;
+    });
+
+    const editableRows = draftNames.map((name, idx) => {
+      const row = document.createElement('div');
+      row.className = 'edit-row';
+      row.innerHTML = `
+        <input type="text" value="${escapeHtml(name)}" data-idx="${idx}" />
+        <button class="remove-btn" data-idx="${idx}" title="Remove">×</button>
+      `;
+      return row;
+    });
+
+    lockedRows.forEach(r => editList.appendChild(r));
+    editableRows.forEach(r => editList.appendChild(r));
+
+    // Bind input changes
+    editList.querySelectorAll('input[data-idx]').forEach(input => {
+      input.addEventListener('input', (e) => {
+        const idx = parseInt(e.target.dataset.idx, 10);
+        draftNames[idx] = e.target.value;
+      });
+    });
+
+    // Bind remove buttons
+    editList.querySelectorAll('.remove-btn[data-idx]').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const idx = parseInt(e.target.dataset.idx, 10);
+        draftNames.splice(idx, 1);
+        renderEditList();
+      });
+    });
+  }
+
+  editRosterBtn.addEventListener('click', openEditor);
+  cancelEditBtn.addEventListener('click', () => closeEditor(false));
+  saveEditBtn.addEventListener('click', () => closeEditor(true));
+
+  function addNewName() {
+    const name = newNameInput.value.trim();
+    if (!name) return;
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    if (draftNames.includes(name) || winnerNames.includes(name)) {
+      alert(`"${name}" is already in the pool.`);
+      return;
+    }
+    draftNames.push(name);
+    newNameInput.value = '';
+    renderEditList();
+    newNameInput.focus();
+  }
+
+  addNameBtn.addEventListener('click', addNewName);
+  newNameInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') addNewName();
+  });
+
   resetBtn.addEventListener('click', () => {
-    const ok = confirm(
-      'Start a new cycle?\n\n' +
-      'This will:\n' +
-      '  • Restore all 10 names to the pool\n' +
-      '  • Keep the payout ledger as a record\n\n' +
-      'Use this only after everyone has received their payout.'
-    );
-    if (!ok) return;
-    names = [...DEFAULT_NAMES];
-    recentlyPicked.clear();
-    renderNames();
-    resultName.textContent = 'draw the lottery';
-    resultName.className = 'result-name idle';
-    resultLabel.textContent = 'Ready to draw';
-    spinBtn.disabled = false;
-    saveState();
+    openCycleModal();
+  });
+
+  // ===========================================================
+  // 💰 New Cycle modal — set amount + confirm roster
+  // ===========================================================
+  function openCycleModal() {
+    const modal = document.getElementById('cycleModal');
+    const amountInput = document.getElementById('cycleAmount');
+    const previewEl = document.getElementById('cyclePreview');
+
+    // Pre-fill with current amount
+    amountInput.value = perPerson;
+
+    // Update preview as they type
+    function updatePreview() {
+      const amount = parseInt(amountInput.value, 10) || 0;
+      const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+      const fullRoster = [...new Set([...names, ...winnerNames])];
+      const peopleCount = fullRoster.length > 0 ? fullRoster.length : DEFAULT_NAMES.length;
+      const total = amount * peopleCount;
+      previewEl.innerHTML =
+        `<strong>${peopleCount} people</strong> × <strong>${formatINR(amount)}</strong> = <strong style="color:var(--accent)">${formatINR(total)}</strong> monthly prize`;
+    }
+    amountInput.oninput = updatePreview;
+    updatePreview();
+
+    modal.hidden = false;
+    setTimeout(() => amountInput.focus(), 50);
+  }
+
+  function closeCycleModal(confirmed) {
+    const modal = document.getElementById('cycleModal');
+    const amountInput = document.getElementById('cycleAmount');
+
+    if (confirmed) {
+      const newAmount = parseInt(amountInput.value, 10);
+      if (!Number.isFinite(newAmount) || newAmount <= 0) {
+        alert('Please enter a valid amount greater than 0.');
+        return;
+      }
+      if (newAmount > 1000000) {
+        alert('That seems like a lot. Please enter a reasonable amount.');
+        return;
+      }
+
+      perPerson = newAmount;
+      const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+      const fullRoster = [...new Set([...names, ...winnerNames])];
+      names = fullRoster.length > 0 ? fullRoster : [...DEFAULT_NAMES];
+      skipping.clear();
+      recentlyPicked.clear();
+      renderNames();
+      renderAmounts();
+      resultName.textContent = 'draw the lottery';
+      resultName.className = 'result-name idle';
+      resultLabel.textContent = 'Ready to draw';
+      spinBtn.disabled = false;
+      saveState();
+    }
+
+    modal.hidden = true;
+  }
+
+  document.getElementById('cycleModalConfirm').addEventListener('click', () => closeCycleModal(true));
+  document.getElementById('cycleModalCancel').addEventListener('click', () => closeCycleModal(false));
+  document.getElementById('cycleModal').addEventListener('click', (e) => {
+    if (e.target.id === 'cycleModal') closeCycleModal(false);
+  });
+
+  // Allow Enter to confirm
+  document.getElementById('cycleAmount').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') closeCycleModal(true);
+    if (e.key === 'Escape') closeCycleModal(false);
   });
 
   function formatDate(ts) {
@@ -913,6 +1552,45 @@
     document.getElementById('statMonth').textContent = `${Math.min(monthNum, totalPool)} / ${totalPool}`;
     document.getElementById('statRemaining').textContent = names.length;
     document.getElementById('statPaid').textContent = totalPaid;
+  }
+
+  function formatINR(amount) {
+    return '₹' + amount.toLocaleString('en-IN');
+  }
+
+  function formatINRShort(amount) {
+    if (amount >= 100000) return '₹' + (amount / 100000).toFixed(amount % 100000 === 0 ? 0 : 1) + 'L';
+    if (amount >= 1000) return '₹' + (amount / 1000).toFixed(amount % 1000 === 0 ? 0 : 1) + 'K';
+    return '₹' + amount;
+  }
+
+  function renderAmounts() {
+    const totalPool = (history.length + names.length);
+    const monthlyPrize = totalPool * perPerson;
+
+    const sideMark = document.getElementById('sideMarkAmount');
+    if (sideMark) sideMark.textContent = `POOL · ${formatINRShort(monthlyPrize)} / MONTH`;
+
+    const headerMeta = document.getElementById('headerMeta');
+    if (headerMeta) headerMeta.textContent = `Monthly Lottery · ${formatINR(monthlyPrize)} / month`;
+
+    const subtitle = document.getElementById('subtitleText');
+    if (subtitle) {
+      subtitle.textContent =
+        `${totalPool} friends, ${formatINR(perPerson)} each, every month. ` +
+        `One name drawn, one person walks away with ${formatINR(monthlyPrize)}. ` +
+        `Repeat until everyone has had their turn.`;
+    }
+
+    // Re-render banner & names too, since their copy uses the amount
+    updateSkipBanner();
+
+    // Update reset button label
+    const resetLabel = names.length === 0
+      ? `Start New Cycle (${formatINR(perPerson)}/mo)`
+      : 'Reset Pool (New Cycle)';
+    const rb = document.getElementById('resetBtn');
+    if (rb) rb.textContent = resetLabel;
   }
 
   function renderWinnersSoFar() {
@@ -983,7 +1661,19 @@
       if (!ok) return;
     }
 
-    const pool = names;
+    // Pool = active names (not skipping)
+    const pool = names.filter(n => !skipping.has(n));
+
+    if (pool.length === 0) {
+      alert('Everyone is skipping this month! At least one person must participate.');
+      return;
+    }
+    if (pool.length === 1) {
+      const ok = confirm(
+        `Only ${pool[0]} is participating — they will win by default. Continue?`
+      );
+      if (!ok) return;
+    }
 
     spinning = true;
     spinBtn.disabled = true;
@@ -1016,9 +1706,15 @@
         resultName.className = 'result-name winner';
         const monthNum = history.length + 1;
         const totalPeople = history.length + names.length;
-        resultLabel.textContent = `Month ${monthNum} of ${totalPeople} · gets ₹10,000`;
+        const prize = totalPeople * perPerson;
+        resultLabel.textContent = `Month ${monthNum} of ${totalPeople} · gets ${formatINR(prize)}`;
 
-        history.unshift({ name: winner, time: Date.now() });
+        history.unshift({
+          name: winner,
+          time: Date.now(),
+          prize: prize,
+          optedOut: [...skipping]
+        });
         recentlyPicked.add(winner);
         renderHistory();
         saveState();
@@ -1027,8 +1723,10 @@
           const idx = names.indexOf(winner);
           if (idx !== -1) {
             names.splice(idx, 1);
-            renderNames();
           }
+          // Reset opt-outs for next month
+          skipping.clear();
+          renderNames();
           updateStats();
           if (names.length === 0) {
             resultLabel.textContent = '🎉 All months complete — cycle finished!';
@@ -1078,6 +1776,7 @@
   renderNames();
   renderHistory();
   updateStats();
+  renderAmounts();
   if (names.length === 0) {
     resultLabel.textContent = '🎉 All months complete — start new cycle';
     spinBtn.disabled = true;
