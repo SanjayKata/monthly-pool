@@ -1022,7 +1022,7 @@
 
     <footer>
       <span id="syncStatus">● connecting…</span>
-      <span>v1.6 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
+      <span>v1.9 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
     </footer>
   </div>
 
@@ -1175,6 +1175,29 @@
   let recentlyPicked = new Set();
   let spinning = false;
 
+  // Sanitize: remove malformed/empty entries that can cause count drift
+  function sanitizeData() {
+    names = names
+      .filter(n => typeof n === 'string')
+      .map(n => n.trim())
+      .filter(n => n.length > 0);
+
+    history = history.filter(e => {
+      if (typeof e === 'string') return e.trim().length > 0;
+      return e && typeof e.name === 'string' && e.name.trim().length > 0;
+    });
+
+    // Remove duplicates (case-insensitive) — keep first occurrence
+    const seen = new Set();
+    names = names.filter(n => {
+      const k = n.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+  }
+  sanitizeData();
+
   // Async: fetch cloud copy and overwrite local if newer/different
   (async () => {
     if (!CLOUD_ENABLED) {
@@ -1190,6 +1213,7 @@
       history = cloud.history;
       skipping = new Set(Array.isArray(cloud.skipping) ? cloud.skipping : []);
       perPerson = typeof cloud.perPerson === 'number' ? cloud.perPerson : DEFAULT_PER_PERSON;
+      sanitizeData();
       saveLocal({ names, history, skipping: [...skipping], perPerson });
       renderNames();
       renderHistory();
@@ -1217,6 +1241,7 @@
         history = cloud.history;
         skipping = new Set(Array.isArray(cloud.skipping) ? cloud.skipping : []);
         perPerson = typeof cloud.perPerson === 'number' ? cloud.perPerson : perPerson;
+        sanitizeData();
         saveLocal({ names, history, skipping: [...skipping], perPerson });
         renderNames();
         renderHistory();
@@ -1250,6 +1275,29 @@
       namesGrid.appendChild(chip);
     });
     updateSkipBanner();
+    updateEditAvailability();
+  }
+
+  function updateEditAvailability() {
+    const editBtn = document.getElementById('editRosterBtn');
+    const hint = document.getElementById('rosterHint');
+    if (!editBtn || !hint) return;
+
+    // Editing only allowed when no draws have happened (fresh cycle)
+    // OR when all draws are done (between cycles)
+    const cycleInProgress = history.length > 0 && names.length > 0;
+
+    if (cycleInProgress) {
+      editBtn.style.display = 'none';
+      hint.innerHTML = `Click anyone who's paying but skipping this month's draw · <span style="color:var(--accent)">Tap to toggle</span>`;
+    } else {
+      editBtn.style.display = '';
+      if (history.length === 0) {
+        hint.innerHTML = `Cycle hasn't started · <span style="color:var(--accent)">Edit roster or click to opt out</span>`;
+      } else {
+        hint.innerHTML = `Cycle complete · <span style="color:var(--accent)">Start a new cycle to edit roster</span>`;
+      }
+    }
   }
 
   function toggleSkip(name) {
@@ -1276,8 +1324,11 @@
       return;
     }
     const eligibleCount = names.length - skipCount;
-    const totalPool = (history.length + names.length);
-    const monthlyPrize = totalPool * perPerson;
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    const allParticipants = new Set();
+    names.forEach(n => allParticipants.add(n.toLowerCase()));
+    winnerNames.forEach(n => allParticipants.add(n.toLowerCase()));
+    const monthlyPrize = allParticipants.size * perPerson;
     const skippers = [...skipping].join(', ');
     banner.hidden = false;
     banner.innerHTML = `
@@ -1333,22 +1384,26 @@
 
   function closeEditor(save) {
     if (save) {
-      // Validate: no duplicates, no empty, at least 2 people
+      // Validate: no duplicates (case-insensitive), no empty, at least 2 people
       const cleaned = draftNames.map(n => n.trim()).filter(n => n.length > 0);
-      const unique = [...new Set(cleaned)];
+      const lowered = cleaned.map(n => n.toLowerCase());
+      const uniqueLowered = [...new Set(lowered)];
 
-      if (unique.length !== cleaned.length) {
-        alert('Duplicate names found. Each person must have a unique name.');
+      if (uniqueLowered.length !== cleaned.length) {
+        alert('Duplicate names found (case-insensitive). Each person must have a unique name.');
         return;
       }
-      if (unique.length < 2) {
+      if (cleaned.length < 2) {
         alert('Need at least 2 people in the pool.');
         return;
       }
 
+      const unique = cleaned;
+
       // Make sure past winners are still represented (they're locked)
       const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
-      const missingWinners = winnerNames.filter(w => !unique.includes(w));
+      const uniqueLoweredSet = new Set(unique.map(n => n.toLowerCase()));
+      const missingWinners = winnerNames.filter(w => !uniqueLoweredSet.has(w.toLowerCase()));
       if (missingWinners.length > 0) {
         alert(
           `Cannot remove past winners: ${missingWinners.join(', ')}.\n\n` +
@@ -1358,9 +1413,13 @@
       }
 
       // The new "still in pool" = unique names that haven't won yet
-      names = unique.filter(n => !winnerNames.includes(n));
+      // Case-insensitive comparison with winner names
+      const winnersLowered = new Set(winnerNames.map(n => n.toLowerCase()));
+      names = unique.filter(n => !winnersLowered.has(n.toLowerCase()));
       renderNames();
       renderHistory();
+      updateStats();
+      renderAmounts();
       saveState();
     }
 
@@ -1424,8 +1483,12 @@
     const name = newNameInput.value.trim();
     if (!name) return;
     const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
-    if (draftNames.includes(name) || winnerNames.includes(name)) {
+    const allCurrent = [...draftNames, ...winnerNames];
+    // Case-insensitive duplicate check
+    const isDuplicate = allCurrent.some(n => n.trim().toLowerCase() === name.toLowerCase());
+    if (isDuplicate) {
       alert(`"${name}" is already in the pool.`);
+      newNameInput.select();
       return;
     }
     draftNames.push(name);
@@ -1458,7 +1521,13 @@
     function updatePreview() {
       const amount = parseInt(amountInput.value, 10) || 0;
       const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
-      const fullRoster = [...new Set([...names, ...winnerNames])];
+      // Case-insensitive dedup, keep original casing of first occurrence
+      const seen = new Map();
+      [...names, ...winnerNames].forEach(n => {
+        const k = n.trim().toLowerCase();
+        if (k && !seen.has(k)) seen.set(k, n.trim());
+      });
+      const fullRoster = [...seen.values()];
       const peopleCount = fullRoster.length > 0 ? fullRoster.length : DEFAULT_NAMES.length;
       const total = amount * peopleCount;
       previewEl.innerHTML =
@@ -1488,7 +1557,12 @@
 
       perPerson = newAmount;
       const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
-      const fullRoster = [...new Set([...names, ...winnerNames])];
+      const seen = new Map();
+      [...names, ...winnerNames].forEach(n => {
+        const k = n.trim().toLowerCase();
+        if (k && !seen.has(k)) seen.set(k, n.trim());
+      });
+      const fullRoster = [...seen.values()];
       names = fullRoster.length > 0 ? fullRoster : [...DEFAULT_NAMES];
       skipping.clear();
       recentlyPicked.clear();
@@ -1547,7 +1621,12 @@
 
   function updateStats() {
     const totalPaid = history.length;
-    const totalPool = totalPaid + names.length;
+    // Total = unique participants (active + past winners), deduplicated
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    const allParticipants = new Set();
+    names.forEach(n => allParticipants.add(n.toLowerCase()));
+    winnerNames.forEach(n => allParticipants.add(n.toLowerCase()));
+    const totalPool = allParticipants.size;
     const monthNum = totalPaid + (names.length > 0 ? 1 : 0);
     document.getElementById('statMonth').textContent = `${Math.min(monthNum, totalPool)} / ${totalPool}`;
     document.getElementById('statRemaining').textContent = names.length;
@@ -1565,7 +1644,13 @@
   }
 
   function renderAmounts() {
-    const totalPool = (history.length + names.length);
+    // Total pool = unique people across active names + past winners.
+    // Deduplicating prevents drift when cycles reset (winners get re-added to names).
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    const allParticipants = new Set();
+    names.forEach(n => allParticipants.add(n.toLowerCase()));
+    winnerNames.forEach(n => allParticipants.add(n.toLowerCase()));
+    const totalPool = allParticipants.size;
     const monthlyPrize = totalPool * perPerson;
 
     const sideMark = document.getElementById('sideMarkAmount');
@@ -1705,7 +1790,10 @@
         resultName.textContent = winner;
         resultName.className = 'result-name winner';
         const monthNum = history.length + 1;
-        const totalPeople = history.length + names.length;
+        // Dedup participants for accurate count
+        const winnerNamesSet = new Set(history.map(e => typeof e === 'string' ? e : e.name).map(n => n.toLowerCase()));
+        names.forEach(n => winnerNamesSet.add(n.toLowerCase()));
+        const totalPeople = winnerNamesSet.size;
         const prize = totalPeople * perPerson;
         resultLabel.textContent = `Month ${monthNum} of ${totalPeople} · gets ${formatINR(prize)}`;
 
