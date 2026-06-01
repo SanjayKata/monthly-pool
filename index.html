@@ -186,6 +186,7 @@
     font-size: 32px;
     line-height: 1;
     color: var(--accent);
+    white-space: nowrap;
   }
 
   .stat-label {
@@ -193,6 +194,7 @@
     text-transform: uppercase;
     letter-spacing: 0.15em;
     color: var(--muted);
+    white-space: nowrap;
   }
 
   /* Main grid */
@@ -914,6 +916,55 @@
     max-width: 90px;
   }
 
+  .modal-field-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 8px;
+    margin-top: 18px;
+  }
+
+  .modal-field-label:first-of-type { margin-top: 0; }
+
+  .modal-months-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+
+  .month-chip {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 8px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+    min-width: 44px;
+  }
+
+  .month-chip:hover {
+    border-color: var(--accent);
+  }
+
+  .month-chip.selected {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .modal-months-hint {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 12px;
+    min-height: 16px;
+    line-height: 1.4;
+  }
+
   .modal-preview {
     font-size: 14px;
     color: var(--muted);
@@ -1022,7 +1073,7 @@
 
     <footer>
       <span id="syncStatus">● connecting…</span>
-      <span>v1.9 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
+      <span>v2.1 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
     </footer>
   </div>
 
@@ -1030,12 +1081,13 @@
   <div class="modal-backdrop" id="cycleModal" hidden>
     <div class="modal">
       <div class="modal-label">Start New Cycle</div>
-      <h2 class="modal-title">Set the monthly amount</h2>
+      <h2 class="modal-title">Configure this cycle</h2>
       <p class="modal-desc">
-        How much will each person contribute every month? This amount will be locked
-        for the entire cycle to keep things fair.
+        Set the monthly contribution and how many months you want the cycle to run.
+        These values lock for the entire cycle to keep things fair.
       </p>
 
+      <div class="modal-field-label">Share per person / month</div>
       <div class="modal-input-row">
         <span class="modal-currency">₹</span>
         <input
@@ -1047,8 +1099,14 @@
           step="100"
           value="1000"
         />
-        <span class="modal-suffix">per person / month</span>
+        <span class="modal-suffix">per person<br>/ month</span>
       </div>
+
+      <div class="modal-field-label">Number of months</div>
+      <div class="modal-months-row" id="cycleMonthsRow">
+        <!-- chips dynamically rendered -->
+      </div>
+      <div class="modal-months-hint" id="cycleMonthsHint"></div>
 
       <div class="modal-preview" id="cyclePreview"></div>
 
@@ -1065,6 +1123,7 @@
     "Naveen", "Bala", "Ramya", "Rahul", "Sanjay"
   ];
   const DEFAULT_PER_PERSON = 1000; // ₹ per person per month
+  const DEFAULT_CYCLE_MONTHS = null; // null means: months = number of people
 
   // ===========================================================
   // ☁️  CLOUD STORAGE — JSONBin.io
@@ -1147,7 +1206,7 @@
   }
 
   function saveState() {
-    const state = { names, history, skipping: [...skipping], perPerson };
+    const state = { names, history, skipping: [...skipping], perPerson, cycleMonths };
     saveLocal(state);
     saveCloud(state);
   }
@@ -1172,6 +1231,7 @@
   let history = cached?.history ?? [];
   let skipping = new Set(cached?.skipping ?? []);
   let perPerson = cached?.perPerson ?? DEFAULT_PER_PERSON;
+  let cycleMonths = cached?.cycleMonths ?? DEFAULT_CYCLE_MONTHS; // null = same as people count
   let recentlyPicked = new Set();
   let spinning = false;
 
@@ -1213,8 +1273,9 @@
       history = cloud.history;
       skipping = new Set(Array.isArray(cloud.skipping) ? cloud.skipping : []);
       perPerson = typeof cloud.perPerson === 'number' ? cloud.perPerson : DEFAULT_PER_PERSON;
+      cycleMonths = typeof cloud.cycleMonths === 'number' ? cloud.cycleMonths : DEFAULT_CYCLE_MONTHS;
       sanitizeData();
-      saveLocal({ names, history, skipping: [...skipping], perPerson });
+      saveLocal({ names, history, skipping: [...skipping], perPerson, cycleMonths });
       renderNames();
       renderHistory();
       renderAmounts();
@@ -1234,15 +1295,16 @@
       if (spinning) return; // don't refresh mid-spin
       const cloud = await loadCloud();
       if (!cloud) return;
-      const cloudStr = JSON.stringify({ names: cloud.names, history: cloud.history, skipping: cloud.skipping ?? [], perPerson: cloud.perPerson });
-      const localStr = JSON.stringify({ names, history, skipping: [...skipping], perPerson });
+      const cloudStr = JSON.stringify({ names: cloud.names, history: cloud.history, skipping: cloud.skipping ?? [], perPerson: cloud.perPerson, cycleMonths: cloud.cycleMonths });
+      const localStr = JSON.stringify({ names, history, skipping: [...skipping], perPerson, cycleMonths });
       if (cloudStr !== localStr && Array.isArray(cloud.history)) {
         names = cloud.names ?? names;
         history = cloud.history;
         skipping = new Set(Array.isArray(cloud.skipping) ? cloud.skipping : []);
         perPerson = typeof cloud.perPerson === 'number' ? cloud.perPerson : perPerson;
+        cycleMonths = typeof cloud.cycleMonths === 'number' ? cloud.cycleMonths : cycleMonths;
         sanitizeData();
-        saveLocal({ names, history, skipping: [...skipping], perPerson });
+        saveLocal({ names, history, skipping: [...skipping], perPerson, cycleMonths });
         renderNames();
         renderHistory();
         renderAmounts();
@@ -1328,14 +1390,19 @@
     const allParticipants = new Set();
     names.forEach(n => allParticipants.add(n.toLowerCase()));
     winnerNames.forEach(n => allParticipants.add(n.toLowerCase()));
-    const monthlyPrize = allParticipants.size * perPerson;
+    const monthlyPool = allParticipants.size * perPerson;
+    const drawsPerMonth = getDrawsPerMonth();
+    const prizePerWinner = Math.round(monthlyPool / drawsPerMonth);
     const skippers = [...skipping].join(', ');
+    const winnerText = drawsPerMonth === 1
+      ? `winner gets ${formatINR(prizePerWinner)}`
+      : `${drawsPerMonth} winners split ${formatINR(monthlyPool)} (${formatINR(prizePerWinner)} each)`;
     banner.hidden = false;
     banner.innerHTML = `
       <span class="skip-banner-icon">⏸</span>
       <div class="skip-banner-text">
         <strong>${skipCount} opting out of this month's draw:</strong> ${escapeHtml(skippers)}<br>
-        <span class="skip-banner-prize">Everyone still pays ${formatINR(perPerson)} · Prize is still ${formatINR(monthlyPrize)} · ${eligibleCount} eligible to win this month</span>
+        <span class="skip-banner-prize">Everyone still pays ${formatINR(perPerson)} · This month's ${winnerText} · ${eligibleCount} eligible to win</span>
       </div>
     `;
   }
@@ -1507,32 +1574,94 @@
   });
 
   // ===========================================================
-  // 💰 New Cycle modal — set amount + confirm roster
+  // 💰 New Cycle modal — set amount + months + confirm roster
   // ===========================================================
+  let modalSelectedMonths = null; // tracks selection while modal is open
+
+  function getDivisors(n) {
+    const result = [];
+    for (let i = 1; i <= n; i++) {
+      if (n % i === 0) result.push(i);
+    }
+    return result;
+  }
+
   function openCycleModal() {
     const modal = document.getElementById('cycleModal');
     const amountInput = document.getElementById('cycleAmount');
     const previewEl = document.getElementById('cyclePreview');
+    const monthsRow = document.getElementById('cycleMonthsRow');
+    const monthsHint = document.getElementById('cycleMonthsHint');
 
     // Pre-fill with current amount
     amountInput.value = perPerson;
 
-    // Update preview as they type
-    function updatePreview() {
-      const amount = parseInt(amountInput.value, 10) || 0;
+    // Determine roster size for month options
+    function computePeopleCount() {
       const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
-      // Case-insensitive dedup, keep original casing of first occurrence
       const seen = new Map();
       [...names, ...winnerNames].forEach(n => {
         const k = n.trim().toLowerCase();
         if (k && !seen.has(k)) seen.set(k, n.trim());
       });
       const fullRoster = [...seen.values()];
-      const peopleCount = fullRoster.length > 0 ? fullRoster.length : DEFAULT_NAMES.length;
-      const total = amount * peopleCount;
-      previewEl.innerHTML =
-        `<strong>${peopleCount} people</strong> × <strong>${formatINR(amount)}</strong> = <strong style="color:var(--accent)">${formatINR(total)}</strong> monthly prize`;
+      return fullRoster.length > 0 ? fullRoster.length : DEFAULT_NAMES.length;
     }
+
+    const peopleCount = computePeopleCount();
+    const divisors = getDivisors(peopleCount);
+
+    // Default selection: previously chosen if still valid, else max (= peopleCount)
+    if (cycleMonths && divisors.includes(cycleMonths)) {
+      modalSelectedMonths = cycleMonths;
+    } else {
+      modalSelectedMonths = peopleCount;
+    }
+
+    // Render month chips
+    function renderMonthChips() {
+      monthsRow.innerHTML = '';
+      divisors.forEach(m => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'month-chip';
+        if (m === modalSelectedMonths) btn.classList.add('selected');
+        btn.textContent = m;
+        btn.addEventListener('click', () => {
+          modalSelectedMonths = m;
+          renderMonthChips();
+          updatePreview();
+        });
+        monthsRow.appendChild(btn);
+      });
+    }
+
+    function updatePreview() {
+      const amount = parseInt(amountInput.value, 10) || 0;
+      const months = modalSelectedMonths;
+      const drawsPerMonth = peopleCount / months;
+      const monthlyPool = amount * peopleCount;          // Total pool that month
+      const prizePerWinner = monthlyPool / drawsPerMonth; // Split among winners
+      const totalContribution = amount * months;          // Each person pays this total
+
+      // Hint about draws per month
+      if (drawsPerMonth === 1) {
+        monthsHint.innerHTML = `Each month, <strong style="color:var(--ink)">1 person wins ${formatINR(prizePerWinner)}</strong>. Cycle runs for ${months} months.`;
+      } else {
+        monthsHint.innerHTML = `Each month, <strong style="color:var(--ink)">${drawsPerMonth} people split ${formatINR(monthlyPool)}</strong> (${formatINR(prizePerWinner)} each). Cycle runs for ${months} months.`;
+      }
+
+      // Main preview — balanced savings model
+      previewEl.innerHTML = `
+        <div style="margin-bottom:6px"><strong>${peopleCount} people</strong> × <strong>${formatINR(amount)}</strong>/mo × <strong>${months}</strong> ${months === 1 ? 'month' : 'months'}</div>
+        <div style="color:var(--muted); font-size:12px; line-height:1.5">
+          Each person pays <strong style="color:var(--ink)">${formatINR(totalContribution)}</strong> total ·
+          Each person wins <strong style="color:var(--ink)">${formatINR(prizePerWinner)}</strong> once
+        </div>
+      `;
+    }
+
+    renderMonthChips();
     amountInput.oninput = updatePreview;
     updatePreview();
 
@@ -1554,8 +1683,13 @@
         alert('That seems like a lot. Please enter a reasonable amount.');
         return;
       }
+      if (!modalSelectedMonths || modalSelectedMonths < 1) {
+        alert('Please select a number of months.');
+        return;
+      }
 
       perPerson = newAmount;
+      cycleMonths = modalSelectedMonths;
       const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
       const seen = new Map();
       [...names, ...winnerNames].forEach(n => {
@@ -1564,9 +1698,12 @@
       });
       const fullRoster = [...seen.values()];
       names = fullRoster.length > 0 ? fullRoster : [...DEFAULT_NAMES];
+      // Starting a new cycle clears history (it's a fresh start)
+      history = [];
       skipping.clear();
       recentlyPicked.clear();
       renderNames();
+      renderHistory();
       renderAmounts();
       resultName.textContent = 'draw the lottery';
       resultName.className = 'result-name idle';
@@ -1614,21 +1751,50 @@
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }
 
-  function hasDrawnThisMonth() {
+  function getCycleMonths() {
+    // If cycleMonths is set, use it. Otherwise default to total participants.
+    if (cycleMonths && cycleMonths > 0) return cycleMonths;
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    const all = new Set();
+    names.forEach(n => all.add(n.toLowerCase()));
+    winnerNames.forEach(n => all.add(n.toLowerCase()));
+    return all.size;
+  }
+
+  function getDrawsPerMonth() {
+    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
+    const all = new Set();
+    names.forEach(n => all.add(n.toLowerCase()));
+    winnerNames.forEach(n => all.add(n.toLowerCase()));
+    const people = all.size;
+    const months = getCycleMonths();
+    if (months <= 0) return 1;
+    return Math.max(1, Math.round(people / months));
+  }
+
+  function drawsThisCalendarMonth() {
     const currentKey = getCurrentMonthKey();
-    return history.some(e => e.time && getEntryMonthKey(e.time) === currentKey);
+    return history.filter(e => e.time && getEntryMonthKey(e.time) === currentKey).length;
+  }
+
+  function hasDrawnThisMonth() {
+    // Considered "fully drawn" only if we've hit the per-month quota
+    return drawsThisCalendarMonth() >= getDrawsPerMonth();
   }
 
   function updateStats() {
     const totalPaid = history.length;
-    // Total = unique participants (active + past winners), deduplicated
-    const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
-    const allParticipants = new Set();
-    names.forEach(n => allParticipants.add(n.toLowerCase()));
-    winnerNames.forEach(n => allParticipants.add(n.toLowerCase()));
-    const totalPool = allParticipants.size;
-    const monthNum = totalPaid + (names.length > 0 ? 1 : 0);
-    document.getElementById('statMonth').textContent = `${Math.min(monthNum, totalPool)} / ${totalPool}`;
+    const months = getCycleMonths();
+    const drawsPerMonth = getDrawsPerMonth();
+    // Current month = ceil(totalPaid / drawsPerMonth) + (1 if there's still pool left, else 0 if just-completed)
+    const completedMonths = Math.floor(totalPaid / drawsPerMonth);
+    const partial = totalPaid % drawsPerMonth > 0 ? 1 : 0;
+    const monthNum = names.length === 0 ? months : Math.min(months, completedMonths + (partial > 0 ? 1 : (totalPaid === 0 ? 1 : completedMonths < months ? 1 : 0)));
+    // Simpler: current month = ceil((totalPaid + 1) / drawsPerMonth) if names left, else months
+    const currentMonth = names.length === 0
+      ? months
+      : Math.min(months, Math.ceil((totalPaid + 1) / drawsPerMonth));
+    document.getElementById('statMonth').textContent = `${currentMonth} / ${months}`;
     document.getElementById('statRemaining').textContent = names.length;
     document.getElementById('statPaid').textContent = totalPaid;
   }
@@ -1645,13 +1811,14 @@
 
   function renderAmounts() {
     // Total pool = unique people across active names + past winners.
-    // Deduplicating prevents drift when cycles reset (winners get re-added to names).
     const winnerNames = history.map(e => typeof e === 'string' ? e : e.name);
     const allParticipants = new Set();
     names.forEach(n => allParticipants.add(n.toLowerCase()));
     winnerNames.forEach(n => allParticipants.add(n.toLowerCase()));
     const totalPool = allParticipants.size;
     const monthlyPrize = totalPool * perPerson;
+    const months = getCycleMonths();
+    const drawsPerMonth = getDrawsPerMonth();
 
     const sideMark = document.getElementById('sideMarkAmount');
     if (sideMark) sideMark.textContent = `POOL · ${formatINRShort(monthlyPrize)} / MONTH`;
@@ -1661,10 +1828,14 @@
 
     const subtitle = document.getElementById('subtitleText');
     if (subtitle) {
+      const prizePerWinner = Math.round(monthlyPrize / drawsPerMonth);
+      const totalContribution = perPerson * months;
+      const drawsText = drawsPerMonth === 1
+        ? `One name drawn per month`
+        : `${drawsPerMonth} names drawn per month (split pool equally)`;
+      const totalText = `Each person pays ${formatINR(totalContribution)} total over ${months} ${months === 1 ? 'month' : 'months'}, wins ${formatINR(prizePerWinner)} once.`;
       subtitle.textContent =
-        `${totalPool} friends, ${formatINR(perPerson)} each, every month. ` +
-        `One name drawn, one person walks away with ${formatINR(monthlyPrize)}. ` +
-        `Repeat until everyone has had their turn.`;
+        `${totalPool} friends, ${formatINR(perPerson)} each per month. ${drawsText}. ${totalText}`;
     }
 
     // Re-render banner & names too, since their copy uses the amount
@@ -1736,11 +1907,14 @@
     if (spinning) return;
     if (names.length === 0) return;
 
-    // Guard: only one draw per calendar month (with override option)
+    // Guard: don't exceed draws-per-month quota (with override option)
     if (hasDrawnThisMonth()) {
-      const alreadyWon = history.find(e => e.time && getEntryMonthKey(e.time) === getCurrentMonthKey());
+      const drawsPerMonth = getDrawsPerMonth();
+      const thisMonth = history.filter(e => e.time && getEntryMonthKey(e.time) === getCurrentMonthKey());
+      const winnersThisMonth = thisMonth.map(e => e.name).join(', ');
       const ok = confirm(
-        `${alreadyWon.name} already won this month (${formatMonthYear(alreadyWon.time)}).\n\n` +
+        `This month's draws are complete:\n${winnersThisMonth}\n\n` +
+        `(${drawsPerMonth} ${drawsPerMonth === 1 ? 'draw' : 'draws'} per month)\n\n` +
         `Draw another winner anyway?`
       );
       if (!ok) return;
@@ -1789,13 +1963,21 @@
         // Final reveal
         resultName.textContent = winner;
         resultName.className = 'result-name winner';
-        const monthNum = history.length + 1;
+        const drawNum = history.length + 1;
         // Dedup participants for accurate count
         const winnerNamesSet = new Set(history.map(e => typeof e === 'string' ? e : e.name).map(n => n.toLowerCase()));
         names.forEach(n => winnerNamesSet.add(n.toLowerCase()));
         const totalPeople = winnerNamesSet.size;
-        const prize = totalPeople * perPerson;
-        resultLabel.textContent = `Month ${monthNum} of ${totalPeople} · gets ${formatINR(prize)}`;
+        const months = getCycleMonths();
+        const drawsPerMonth = getDrawsPerMonth();
+        const monthlyPool = totalPeople * perPerson;
+        const prize = Math.round(monthlyPool / drawsPerMonth); // Split among winners that month
+        const currentMonth = Math.min(months, Math.ceil(drawNum / drawsPerMonth));
+        const drawIdxInMonth = ((drawNum - 1) % drawsPerMonth) + 1;
+        const monthLabel = drawsPerMonth > 1
+          ? `Month ${currentMonth}/${months} · Draw ${drawIdxInMonth}/${drawsPerMonth}`
+          : `Month ${currentMonth} of ${months}`;
+        resultLabel.textContent = `${monthLabel} · gets ${formatINR(prize)}`;
 
         history.unshift({
           name: winner,
