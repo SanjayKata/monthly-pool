@@ -1,0 +1,1047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>The Decider — A Random Name Picker</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=JetBrains+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,400;9..144,700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f0e17;
+    --bg-2: #1a1825;
+    --ink: #fffffe;
+    --muted: #a7a9be;
+    --accent: #ff8906;
+    --accent-2: #f25f4c;
+    --accent-3: #e53170;
+    --pop: #e8e6ce;
+    --line: rgba(255, 255, 254, 0.12);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'JetBrains Mono', monospace;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Grainy noise overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 100;
+    opacity: 0.08;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' /%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Gradient orbs in the background */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: -1;
+    background:
+      radial-gradient(circle at 15% 20%, rgba(255, 137, 6, 0.15), transparent 40%),
+      radial-gradient(circle at 85% 80%, rgba(229, 49, 112, 0.18), transparent 40%),
+      radial-gradient(circle at 50% 50%, rgba(242, 95, 76, 0.08), transparent 60%);
+  }
+
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+    position: relative;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 60px;
+    border-bottom: 1px solid var(--line);
+    padding-bottom: 24px;
+  }
+
+  .meta {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-align: right;
+  }
+
+  @media (max-width: 520px) {
+    header { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .meta { text-align: left; }
+  }
+
+  .logo {
+    font-family: 'Bowlby One', sans-serif;
+    font-size: 22px;
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+  }
+
+  .logo span { color: var(--accent); }
+
+  /* Title block */
+  .title-block {
+    margin-bottom: 60px;
+    position: relative;
+  }
+
+  h1 {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: clamp(64px, 12vw, 160px);
+    line-height: 0.85;
+    letter-spacing: -0.05em;
+    margin-bottom: 16px;
+  }
+
+  h1 .italic {
+    font-style: italic;
+    color: var(--accent);
+  }
+
+  .subtitle {
+    font-size: 14px;
+    color: var(--muted);
+    max-width: 480px;
+    line-height: 1.6;
+    margin-top: 24px;
+  }
+
+  .stats-row {
+    margin-top: 36px;
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    padding: 20px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+
+  .stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .stat-num {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: 32px;
+    line-height: 1;
+    color: var(--accent);
+  }
+
+  .stat-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+
+  /* Main grid */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 60px;
+    align-items: stretch;
+  }
+
+  @media (max-width: 860px) {
+    .grid { grid-template-columns: 1fr; gap: 40px; }
+  }
+
+  /* Panel */
+  .panel {
+    background: var(--bg-2);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 28px;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .panel-label {
+    position: absolute;
+    top: -10px;
+    left: 20px;
+    background: var(--bg);
+    padding: 0 10px;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+
+  /* Names list */
+  .names-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  .name-chip {
+    background: rgba(255, 255, 254, 0.04);
+    border: 1px solid var(--line);
+    padding: 10px 14px;
+    font-size: 13px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s ease;
+  }
+
+  .name-chip {
+    cursor: default;
+  }
+
+  .name-chip:hover {
+    border-color: var(--accent);
+    background: rgba(255, 137, 6, 0.08);
+  }
+
+  .name-chip .num {
+    color: var(--muted);
+    font-size: 10px;
+  }
+
+  .hint {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .winners-so-far {
+    margin-top: 24px;
+    padding-top: 20px;
+    border-top: 1px dashed var(--line);
+  }
+
+  .winners-so-far-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 12px;
+  }
+
+  .winners-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .winner-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(255, 137, 6, 0.06);
+    border-left: 2px solid var(--accent);
+    font-size: 12px;
+  }
+
+  .winner-row .winner-name {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .winner-row .winner-month {
+    color: var(--muted);
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+
+  .winners-empty {
+    font-size: 11px;
+    color: var(--muted);
+    font-style: italic;
+    opacity: 0.6;
+  }
+
+  .name-chip.active {
+    background: var(--accent);
+    color: var(--bg);
+    border-color: var(--accent);
+    transform: scale(1.05);
+  }
+
+  .name-chip.active .num { color: var(--bg); }
+
+  /* Add name input */
+  .add-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+
+  .add-row input {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--ink);
+    padding: 10px 14px;
+    font-family: inherit;
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .add-row input:focus { border-color: var(--accent); }
+
+  .btn-mini {
+    background: transparent;
+    border: 1px solid var(--ink);
+    color: var(--ink);
+    padding: 10px 16px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    transition: all 0.2s;
+  }
+
+  .btn-mini:hover {
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  /* Result display */
+  .result-panel {
+    text-align: center;
+    padding: 40px 28px;
+    min-height: 420px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .result-panel::before {
+    content: '★';
+    position: absolute;
+    top: 20px;
+    right: 24px;
+    font-size: 20px;
+    color: var(--accent);
+  }
+
+  .result-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    color: var(--muted);
+    margin-bottom: 16px;
+  }
+
+  .result-name {
+    font-family: 'Fraunces', serif;
+    font-weight: 700;
+    font-size: clamp(40px, 8vw, 88px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+    color: var(--ink);
+    min-height: 1.2em;
+    word-break: break-word;
+    transition: opacity 0.15s;
+  }
+
+  .result-name.idle {
+    color: var(--muted);
+    font-style: italic;
+    opacity: 0.5;
+  }
+
+  .result-name.spinning {
+    color: var(--accent);
+    animation: glitch 0.05s infinite alternate;
+  }
+
+  @keyframes glitch {
+    0% { transform: translate(0, 0); }
+    100% { transform: translate(-1px, 1px); }
+  }
+
+  .result-name.winner {
+    color: var(--accent);
+    animation: pop 0.6s ease-out;
+  }
+
+  @keyframes pop {
+    0% { transform: scale(0.9); opacity: 0; }
+    60% { transform: scale(1.08); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* Spin button */
+  .spin-btn {
+    margin-top: 36px;
+    background: var(--accent);
+    border: none;
+    color: var(--bg);
+    padding: 18px 48px;
+    font-family: 'Bowlby One', sans-serif;
+    font-size: 18px;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    text-transform: uppercase;
+    position: relative;
+    transition: transform 0.1s;
+    box-shadow: 6px 6px 0 var(--accent-3);
+  }
+
+  .spin-btn:hover { transform: translate(-2px, -2px); box-shadow: 8px 8px 0 var(--accent-3); }
+  .spin-btn:active { transform: translate(3px, 3px); box-shadow: 3px 3px 0 var(--accent-3); }
+  .spin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  /* Controls */
+  .controls {
+    margin-top: 24px;
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+  }
+
+  .controls label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+  }
+
+  .controls input[type="checkbox"] {
+    accent-color: var(--accent);
+  }
+
+  /* History */
+  .history {
+    margin-top: 40px;
+  }
+
+  .history-title {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .clear-link {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    cursor: pointer;
+    padding: 0;
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 3px;
+  }
+
+  .clear-link:hover { color: var(--accent-2); }
+
+  .history-item {
+    font-size: 11px;
+    padding: 4px 10px;
+    background: rgba(255, 255, 254, 0.04);
+    border: 1px solid var(--line);
+    color: var(--muted);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .history-date {
+    font-size: 9px;
+    opacity: 0.6;
+    letter-spacing: 0.05em;
+  }
+
+  .history-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .history-item:first-child {
+    color: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 80px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+  }
+
+  @media (max-width: 520px) {
+    footer { flex-direction: column; gap: 8px; }
+  }
+
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+    border-bottom: 1px dotted var(--muted);
+  }
+
+  footer a:hover { color: var(--accent); border-color: var(--accent); }
+
+  /* Decorative side marks */
+  .side-marks {
+    position: absolute;
+    left: -40px;
+    top: 40px;
+    bottom: 40px;
+    width: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    font-size: 9px;
+    color: var(--muted);
+    writing-mode: vertical-rl;
+    text-transform: uppercase;
+    letter-spacing: 0.3em;
+    opacity: 0.6;
+  }
+
+  @media (max-width: 1240px) { .side-marks { display: none; } }
+
+  /* Entrance animation */
+  .fade-in {
+    opacity: 0;
+    transform: translateY(20px);
+    animation: fadeIn 0.8s ease-out forwards;
+  }
+
+  .fade-in:nth-child(2) { animation-delay: 0.1s; }
+  .fade-in:nth-child(3) { animation-delay: 0.2s; }
+
+  @keyframes fadeIn {
+    to { opacity: 1; transform: translateY(0); }
+  }
+</style>
+</head>
+<body>
+  <div class="container">
+    <div class="side-marks">
+      <span>POOL · ₹10K / MONTH</span>
+      <span>EST. 2026</span>
+    </div>
+
+    <header class="fade-in">
+      <div class="logo">THE<span>•</span>POOL</div>
+      <div class="meta">Monthly Lottery · ₹10,000 / month</div>
+    </header>
+
+    <div class="title-block fade-in">
+      <h1>This month's <span class="italic">winner.</span></h1>
+      <p class="subtitle">
+        10 friends, ₹1,000 each, every month. One name drawn,
+        one person walks away with ₹10,000. Repeat until everyone has had their turn.
+      </p>
+
+      <div class="stats-row" id="statsRow">
+        <div class="stat">
+          <span class="stat-num" id="statMonth">—</span>
+          <span class="stat-label">Month</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num" id="statRemaining">—</span>
+          <span class="stat-label">Still in pool</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num" id="statPaid">—</span>
+          <span class="stat-label">Already paid out</span>
+        </div>
+        <div class="stat">
+          <span class="stat-num">₹10K</span>
+          <span class="stat-label">Per month</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <!-- Names panel -->
+      <div class="panel fade-in">
+        <div class="panel-label">Still in the pool</div>
+        <div class="hint">These people haven't received their ₹10,000 yet</div>
+        <div class="names-grid" id="namesGrid"></div>
+
+        <div class="winners-so-far" id="winnersSoFar"></div>
+
+        <button class="btn-mini" id="resetBtn" style="width:100%; margin-top:auto;">Reset Pool (New Cycle)</button>
+      </div>
+
+      <!-- Result panel -->
+      <div class="panel result-panel fade-in">
+        <div class="panel-label">This Month's Winner</div>
+        <div class="result-label" id="resultLabel">Ready to draw</div>
+        <div class="result-name idle" id="resultName">draw the lottery</div>
+
+        <button class="spin-btn" id="spinBtn">Draw Winner</button>
+
+        <div class="history">
+          <div class="history-title">
+            <span>Payout Ledger</span>
+            <button class="clear-link" id="clearHistoryBtn" title="Reset ledger (new cycle)">new cycle</button>
+          </div>
+          <div class="history-list" id="historyList">
+            <span class="history-item" style="opacity: 0.4">— no draws yet —</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <footer>
+      <span id="syncStatus">● connecting…</span>
+      <span>Open source · <a href="#">Fork on GitHub</a></span>
+    </footer>
+  </div>
+
+<script>
+  const DEFAULT_NAMES = [
+    "Jay", "Lavanya", "Payaswini", "Yamini", "Sunny",
+    "Naveen", "Bala", "Ramya", "Rahul", "Sanjay"
+  ];
+
+  // ===========================================================
+  // ☁️  CLOUD STORAGE — JSONBin.io
+  // -----------------------------------------------------------
+  // To enable shared sync across all your friends, do this ONCE:
+  //   1. Go to https://jsonbin.io and sign up (free)
+  //   2. Go to "API Keys" → copy your X-Master-Key
+  //   3. Create a new bin with the JSON: {"names":[],"history":[]}
+  //      Set visibility to PRIVATE
+  //   4. Copy the Bin ID from the URL
+  //   5. Paste both values below, then re-deploy
+  //
+  // ⚠️ This key will be visible to anyone who views your page source.
+  //    That's OK for a small private tool among friends — the worst
+  //    anyone can do is mess with this one bin. Don't reuse this key
+  //    for anything sensitive.
+  // ===========================================================
+  const JSONBIN_API_KEY = 'PASTE_YOUR_X_MASTER_KEY_HERE';
+  const JSONBIN_BIN_ID  = 'PASTE_YOUR_BIN_ID_HERE';
+
+  const CLOUD_ENABLED = !JSONBIN_API_KEY.startsWith('PASTE_') && !JSONBIN_BIN_ID.startsWith('PASTE_');
+  const STORAGE_KEY = 'theDecider.v2';
+
+  // Local cache (so page loads fast and works offline)
+  function loadLocal() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch (e) { return null; }
+  }
+
+  function saveLocal(state) {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
+    catch (e) { /* ignore */ }
+  }
+
+  async function loadCloud() {
+    if (!CLOUD_ENABLED) return null;
+    try {
+      const res = await fetch(
+        `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}/latest`,
+        { headers: { 'X-Master-Key': JSONBIN_API_KEY } }
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      return data.record;
+    } catch (e) {
+      console.warn('Cloud load failed, using local cache', e);
+      setSyncStatus('offline');
+      return null;
+    }
+  }
+
+  let saveQueue = Promise.resolve();
+  async function saveCloud(state) {
+    if (!CLOUD_ENABLED) return;
+    // Chain saves so concurrent updates don't race
+    saveQueue = saveQueue.then(async () => {
+      try {
+        setSyncStatus('syncing');
+        const res = await fetch(
+          `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Master-Key': JSONBIN_API_KEY,
+            },
+            body: JSON.stringify(state),
+          }
+        );
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        setSyncStatus('synced');
+      } catch (e) {
+        console.warn('Cloud save failed', e);
+        setSyncStatus('offline');
+      }
+    });
+    return saveQueue;
+  }
+
+  function saveState() {
+    const state = { names, history };
+    saveLocal(state);
+    saveCloud(state);
+  }
+
+  function setSyncStatus(status) {
+    const el = document.getElementById('syncStatus');
+    if (!el) return;
+    const map = {
+      syncing:  { text: 'syncing…', color: 'var(--muted)' },
+      synced:   { text: '● synced',  color: '#7fdca4' },
+      offline:  { text: '● offline (local only)', color: 'var(--accent-2)' },
+      local:    { text: '● local only — no cloud configured', color: 'var(--muted)' },
+    };
+    const s = map[status] || map.local;
+    el.textContent = s.text;
+    el.style.color = s.color;
+  }
+
+  // Start with local cache (instant), then sync with cloud
+  const cached = loadLocal();
+  let names = cached?.names ?? [...DEFAULT_NAMES];
+  let history = cached?.history ?? [];
+  let recentlyPicked = new Set();
+  let spinning = false;
+
+  // Async: fetch cloud copy and overwrite local if newer/different
+  (async () => {
+    if (!CLOUD_ENABLED) {
+      setSyncStatus('local');
+      return;
+    }
+    setSyncStatus('syncing');
+    const cloud = await loadCloud();
+    if (cloud && Array.isArray(cloud.history)) {
+      // Cloud wins on initial load — it's the shared source of truth
+      names = Array.isArray(cloud.names) && cloud.names.length > 0
+        ? cloud.names : [...DEFAULT_NAMES];
+      history = cloud.history;
+      saveLocal({ names, history });
+      renderNames();
+      renderHistory();
+      if (names.length === 0) {
+        resultLabel.textContent = 'Roster empty — reset to play again';
+        spinBtn.disabled = true;
+      } else {
+        spinBtn.disabled = false;
+      }
+      setSyncStatus('synced');
+    }
+  })();
+
+  // Poll for updates from other users every 15s
+  if (CLOUD_ENABLED) {
+    setInterval(async () => {
+      if (spinning) return; // don't refresh mid-spin
+      const cloud = await loadCloud();
+      if (!cloud) return;
+      const cloudStr = JSON.stringify(cloud);
+      const localStr = JSON.stringify({ names, history });
+      if (cloudStr !== localStr && Array.isArray(cloud.history)) {
+        names = cloud.names ?? names;
+        history = cloud.history;
+        saveLocal({ names, history });
+        renderNames();
+        renderHistory();
+      }
+    }, 15000);
+  }
+
+  const namesGrid = document.getElementById('namesGrid');
+  const resetBtn = document.getElementById('resetBtn');
+  const spinBtn = document.getElementById('spinBtn');
+  const resultName = document.getElementById('resultName');
+  const resultLabel = document.getElementById('resultLabel');
+  const historyList = document.getElementById('historyList');
+
+  function renderNames() {
+    namesGrid.innerHTML = '';
+    names.forEach((name, i) => {
+      const chip = document.createElement('div');
+      chip.className = 'name-chip';
+      chip.dataset.name = name;
+      chip.innerHTML = `<span>${escapeHtml(name)}</span><span class="num">${String(i+1).padStart(2,'0')}</span>`;
+      namesGrid.appendChild(chip);
+    });
+  }
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  resetBtn.addEventListener('click', () => {
+    const ok = confirm(
+      'Start a new cycle?\n\n' +
+      'This will:\n' +
+      '  • Restore all 10 names to the pool\n' +
+      '  • Keep the payout ledger as a record\n\n' +
+      'Use this only after everyone has received their payout.'
+    );
+    if (!ok) return;
+    names = [...DEFAULT_NAMES];
+    recentlyPicked.clear();
+    renderNames();
+    resultName.textContent = 'draw the lottery';
+    resultName.className = 'result-name idle';
+    resultLabel.textContent = 'Ready to draw';
+    spinBtn.disabled = false;
+    saveState();
+  });
+
+  function formatDate(ts) {
+    const d = new Date(ts);
+    const now = new Date();
+    const sameDay = d.toDateString() === now.toDateString();
+    if (sameDay) {
+      return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : '2-digit' });
+  }
+
+  function formatMonthYear(ts) {
+    return new Date(ts).toLocaleDateString([], { month: 'short', year: 'numeric' });
+  }
+
+  function getCurrentMonthKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function getEntryMonthKey(ts) {
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }
+
+  function hasDrawnThisMonth() {
+    const currentKey = getCurrentMonthKey();
+    return history.some(e => e.time && getEntryMonthKey(e.time) === currentKey);
+  }
+
+  function updateStats() {
+    const totalPaid = history.length;
+    const totalPool = totalPaid + names.length;
+    const monthNum = totalPaid + (names.length > 0 ? 1 : 0);
+    document.getElementById('statMonth').textContent = `${Math.min(monthNum, totalPool)} / ${totalPool}`;
+    document.getElementById('statRemaining').textContent = names.length;
+    document.getElementById('statPaid').textContent = totalPaid;
+  }
+
+  function renderWinnersSoFar() {
+    const el = document.getElementById('winnersSoFar');
+    if (!el) return;
+    if (history.length === 0) {
+      el.innerHTML = `
+        <div class="winners-so-far-title">Winners so far</div>
+        <div class="winners-empty">No one has won yet — be the first!</div>
+      `;
+      return;
+    }
+    const total = history.length;
+    // Show oldest first (M1 → latest)
+    const ordered = [...history].reverse();
+    const rows = ordered.map((entry, i) => {
+      const name = typeof entry === 'string' ? entry : entry.name;
+      const time = typeof entry === 'string' ? null : entry.time;
+      const monthLabel = time
+        ? `M${i + 1} · ${formatMonthYear(time)}`
+        : `M${i + 1}`;
+      return `<div class="winner-row">
+        <span class="winner-name">${escapeHtml(name)}</span>
+        <span class="winner-month">${monthLabel}</span>
+      </div>`;
+    }).join('');
+    el.innerHTML = `
+      <div class="winners-so-far-title">Winners so far (${total})</div>
+      <div class="winners-list">${rows}</div>
+    `;
+  }
+
+  function renderHistory() {
+    if (history.length === 0) {
+      historyList.innerHTML = '<span class="history-item" style="opacity: 0.4">— no draws yet —</span>';
+      updateStats();
+      renderWinnersSoFar();
+      return;
+    }
+    const total = history.length;
+    historyList.innerHTML = history.slice(0, 50)
+      .map((entry, displayIdx) => {
+        const name = typeof entry === 'string' ? entry : entry.name;
+        const time = typeof entry === 'string' ? null : entry.time;
+        // history[0] is newest = highest month #
+        const monthNum = total - displayIdx;
+        const dateLabel = time
+          ? `<span class="history-date">M${monthNum} · ${formatMonthYear(time)}</span>`
+          : `<span class="history-date">M${monthNum}</span>`;
+        return `<span class="history-item">${escapeHtml(name)}${dateLabel}</span>`;
+      })
+      .join('');
+    updateStats();
+    renderWinnersSoFar();
+  }
+
+  function spin() {
+    if (spinning) return;
+    if (names.length === 0) return;
+
+    // Guard: only one draw per calendar month (with override option)
+    if (hasDrawnThisMonth()) {
+      const alreadyWon = history.find(e => e.time && getEntryMonthKey(e.time) === getCurrentMonthKey());
+      const ok = confirm(
+        `${alreadyWon.name} already won this month (${formatMonthYear(alreadyWon.time)}).\n\n` +
+        `Draw another winner anyway?`
+      );
+      if (!ok) return;
+    }
+
+    const pool = names;
+
+    spinning = true;
+    spinBtn.disabled = true;
+    resultLabel.textContent = 'Drawing...';
+    resultName.className = 'result-name spinning';
+
+    document.querySelectorAll('.name-chip').forEach(c => c.classList.remove('active'));
+
+    const winner = pool[Math.floor(Math.random() * pool.length)];
+    const duration = 1800;
+    const start = performance.now();
+
+    function tick(now) {
+      const elapsed = now - start;
+      const progress = elapsed / duration;
+      const interval = 50 + Math.pow(progress, 3) * 250;
+
+      const fake = pool[Math.floor(Math.random() * pool.length)];
+      resultName.textContent = fake;
+
+      document.querySelectorAll('.name-chip').forEach(c => {
+        c.classList.toggle('active', c.dataset.name === fake);
+      });
+
+      if (elapsed < duration) {
+        setTimeout(() => requestAnimationFrame(tick), interval);
+      } else {
+        // Final reveal
+        resultName.textContent = winner;
+        resultName.className = 'result-name winner';
+        const monthNum = history.length + 1;
+        const totalPeople = history.length + names.length;
+        resultLabel.textContent = `Month ${monthNum} of ${totalPeople} · gets ₹10,000`;
+
+        history.unshift({ name: winner, time: Date.now() });
+        recentlyPicked.add(winner);
+        renderHistory();
+        saveState();
+
+        setTimeout(() => {
+          const idx = names.indexOf(winner);
+          if (idx !== -1) {
+            names.splice(idx, 1);
+            renderNames();
+          }
+          updateStats();
+          if (names.length === 0) {
+            resultLabel.textContent = '🎉 All months complete — cycle finished!';
+            spinBtn.disabled = true;
+          }
+          saveState();
+        }, 900);
+
+        spinning = false;
+        spinBtn.disabled = false;
+      }
+    }
+
+    requestAnimationFrame(tick);
+  }
+
+  spinBtn.addEventListener('click', spin);
+
+  // Keyboard: spacebar to spin
+  document.addEventListener('keydown', e => {
+    if (e.code === 'Space') {
+      e.preventDefault();
+      spin();
+    }
+  });
+
+  document.getElementById('clearHistoryBtn').addEventListener('click', () => {
+    if (history.length === 0) return;
+    const ok = confirm(
+      '⚠️ Erase the entire payout ledger?\n\n' +
+      'This will wipe the record of who got money in which month. ' +
+      'This cannot be undone.\n\n' +
+      'Only do this if you want to start a completely fresh cycle.'
+    );
+    if (!ok) return;
+    history = [];
+    names = [...DEFAULT_NAMES];
+    renderNames();
+    renderHistory();
+    resultName.textContent = 'draw the lottery';
+    resultName.className = 'result-name idle';
+    resultLabel.textContent = 'Ready to draw';
+    spinBtn.disabled = false;
+    saveState();
+  });
+
+  renderNames();
+  renderHistory();
+  updateStats();
+  if (names.length === 0) {
+    resultLabel.textContent = '🎉 All months complete — start new cycle';
+    spinBtn.disabled = true;
+  }
+</script>
+</body>
+</html>
