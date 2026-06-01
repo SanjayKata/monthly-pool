@@ -3,7 +3,22 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>The Decider — A Random Name Picker</title>
+<title>The Pool — Monthly Lottery</title>
+
+<!-- PWA: Install as app on phone/desktop -->
+<meta name="theme-color" content="#0f0e17" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="The Pool" />
+<meta name="description" content="Monthly lottery pool tracker for 10 friends." />
+
+<!-- App icon (inline SVG → base64, no extra files needed) -->
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f0e17'/><text x='50' y='68' font-family='Georgia,serif' font-size='62' font-weight='700' text-anchor='middle' fill='%23ff8906' font-style='italic'>P</text></svg>" />
+<link rel="apple-touch-icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230f0e17'/><text x='50' y='68' font-family='Georgia,serif' font-size='62' font-weight='700' text-anchor='middle' fill='%23ff8906' font-style='italic'>P</text></svg>" />
+
+<!-- Web App Manifest (inline as data URL — no separate file needed!) -->
+<link rel="manifest" href='data:application/manifest+json;utf8,{"name":"The Pool — Monthly Lottery","short_name":"The Pool","description":"Monthly lottery pool tracker for 10 friends.","start_url":"./","display":"standalone","background_color":"%230f0e17","theme_color":"%230f0e17","orientation":"portrait","icons":[{"src":"data:image/svg%2Bxml;utf8,<svg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 100 100%27><rect width=%27100%27 height=%27100%27 rx=%2720%27 fill=%27%230f0e17%27/><text x=%2750%27 y=%2768%27 font-family=%27Georgia,serif%27 font-size=%2762%27 font-weight=%27700%27 text-anchor=%27middle%27 fill=%27%23ff8906%27 font-style=%27italic%27>P</text></svg>","sizes":"any","type":"image/svg+xml"}]}' />
+
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Bowlby+One&family=JetBrains+Mono:wght@400;600&family=Fraunces:opsz,wght@9..144,400;9..144,700&display=swap" rel="stylesheet">
@@ -78,6 +93,28 @@
     letter-spacing: 0.15em;
     color: var(--muted);
     text-align: right;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+
+  .install-btn {
+    background: transparent;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: inherit;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.15em;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .install-btn:hover {
+    background: var(--accent);
+    color: var(--bg);
   }
 
   @media (max-width: 520px) {
@@ -571,7 +608,10 @@
 
     <header class="fade-in">
       <div class="logo">THE<span>•</span>POOL</div>
-      <div class="meta">Monthly Lottery · ₹10,000 / month</div>
+      <div class="meta">
+        <span>Monthly Lottery · ₹10,000 / month</span>
+        <button id="installBtn" class="install-btn" hidden>↓ Install app</button>
+      </div>
     </header>
 
     <div class="title-block fade-in">
@@ -661,8 +701,8 @@
   //    anyone can do is mess with this one bin. Don't reuse this key
   //    for anything sensitive.
   // ===========================================================
-  const JSONBIN_API_KEY = '$2a$10$KeF8Uy3NzHm59Ax597obje8FKeaxaAQmO7Z3Fd3yPJ2KgocUBtUKq';
-  const JSONBIN_BIN_ID  = '6a1d9b88ddf5aa59f7805794';
+  const JSONBIN_API_KEY = 'PASTE_YOUR_X_MASTER_KEY_HERE';
+  const JSONBIN_BIN_ID  = 'PASTE_YOUR_BIN_ID_HERE';
 
   const CLOUD_ENABLED = !JSONBIN_API_KEY.startsWith('PASTE_') && !JSONBIN_BIN_ID.startsWith('PASTE_');
   const STORAGE_KEY = 'theDecider.v2';
@@ -1041,6 +1081,60 @@
   if (names.length === 0) {
     resultLabel.textContent = '🎉 All months complete — start new cycle';
     spinBtn.disabled = true;
+  }
+
+  // ===========================================================
+  // 📱 PWA Install — let users add to home screen
+  // ===========================================================
+  let deferredInstallPrompt = null;
+  const installBtn = document.getElementById('installBtn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Chrome/Edge/Android: capture the prompt event
+    e.preventDefault();
+    deferredInstallPrompt = e;
+    installBtn.hidden = false;
+  });
+
+  installBtn.addEventListener('click', async () => {
+    if (deferredInstallPrompt) {
+      // Chrome/Android: trigger native install prompt
+      deferredInstallPrompt.prompt();
+      const { outcome } = await deferredInstallPrompt.userChoice;
+      if (outcome === 'accepted') {
+        installBtn.hidden = true;
+      }
+      deferredInstallPrompt = null;
+    } else {
+      // iOS Safari and others: show instructions
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      if (isIOS) {
+        alert(
+          '📱 To install on iPhone:\n\n' +
+          '1. Tap the Share button (square with arrow up) at the bottom of Safari\n' +
+          '2. Scroll down and tap "Add to Home Screen"\n' +
+          '3. Tap "Add" in the top-right corner\n\n' +
+          'The app icon will appear on your home screen!'
+        );
+      } else {
+        alert(
+          '📱 To install this app:\n\n' +
+          '• On Chrome/Edge: Look for the install icon (⊕) in the address bar, or open the menu (⋮) and tap "Install app"\n' +
+          '• On Android: Open the menu (⋮) and tap "Add to Home screen"\n\n' +
+          'The app will appear like a normal app on your device!'
+        );
+      }
+    }
+  });
+
+  // Show install button on iOS too (no beforeinstallprompt event there)
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) && !window.navigator.standalone) {
+    installBtn.hidden = false;
+  }
+
+  // Hide install button if already installed
+  if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone) {
+    installBtn.hidden = true;
   }
 </script>
 </body>
