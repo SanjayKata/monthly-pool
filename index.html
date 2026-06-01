@@ -1073,7 +1073,7 @@
 
     <footer>
       <span id="syncStatus">● connecting…</span>
-      <span>v2.1 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
+      <span>v2.3 · <a href="https://github.com/SanjayKata/monthly-pool" target="_blank">GitHub</a></span>
     </footer>
   </div>
 
@@ -1580,7 +1580,8 @@
 
   function getDivisors(n) {
     const result = [];
-    for (let i = 1; i <= n; i++) {
+    // Skip 1 — a 1-month "cycle" defeats the savings purpose
+    for (let i = 2; i <= n; i++) {
       if (n % i === 0) result.push(i);
     }
     return result;
@@ -1841,6 +1842,14 @@
     // Re-render banner & names too, since their copy uses the amount
     updateSkipBanner();
 
+    // Update spin button label
+    const drawBtn = document.getElementById('spinBtn');
+    if (drawBtn && !drawBtn.disabled) {
+      drawBtn.textContent = drawsPerMonth > 1
+        ? `Draw ${drawsPerMonth} Winners`
+        : 'Draw Winner';
+    }
+
     // Update reset button label
     const resetLabel = names.length === 0
       ? `Start New Cycle (${formatINR(perPerson)}/mo)`
@@ -1860,14 +1869,17 @@
       return;
     }
     const total = history.length;
+    const drawsPerMonth = getDrawsPerMonth();
     // Show oldest first (M1 → latest)
     const ordered = [...history].reverse();
     const rows = ordered.map((entry, i) => {
       const name = typeof entry === 'string' ? entry : entry.name;
       const time = typeof entry === 'string' ? null : entry.time;
+      const drawNum = i + 1;
+      const cycleMonth = Math.ceil(drawNum / drawsPerMonth);
       const monthLabel = time
-        ? `M${i + 1} · ${formatMonthYear(time)}`
-        : `M${i + 1}`;
+        ? `M${cycleMonth} · ${formatMonthYear(time)}`
+        : `M${cycleMonth}`;
       return `<div class="winner-row">
         <span class="winner-name">${escapeHtml(name)}</span>
         <span class="winner-month">${monthLabel}</span>
@@ -1886,16 +1898,19 @@
       renderWinnersSoFar();
       return;
     }
+    const drawsPerMonth = getDrawsPerMonth();
     const total = history.length;
     historyList.innerHTML = history.slice(0, 50)
       .map((entry, displayIdx) => {
         const name = typeof entry === 'string' ? entry : entry.name;
         const time = typeof entry === 'string' ? null : entry.time;
-        // history[0] is newest = highest month #
-        const monthNum = total - displayIdx;
+        // history[0] is newest. drawNum from oldest = total - displayIdx.
+        // Cycle month number = ceil(drawNum / drawsPerMonth)
+        const drawNum = total - displayIdx;
+        const cycleMonth = Math.ceil(drawNum / drawsPerMonth);
         const dateLabel = time
-          ? `<span class="history-date">M${monthNum} · ${formatMonthYear(time)}</span>`
-          : `<span class="history-date">M${monthNum}</span>`;
+          ? `<span class="history-date">M${cycleMonth} · ${formatMonthYear(time)}</span>`
+          : `<span class="history-date">M${cycleMonth}</span>`;
         return `<span class="history-item">${escapeHtml(name)}${dateLabel}</span>`;
       })
       .join('');
@@ -1907,42 +1922,105 @@
     if (spinning) return;
     if (names.length === 0) return;
 
-    // Guard: don't exceed draws-per-month quota (with override option)
-    if (hasDrawnThisMonth()) {
-      const drawsPerMonth = getDrawsPerMonth();
+    const drawsPerMonth = getDrawsPerMonth();
+    const alreadyDrawnThisMonth = drawsThisCalendarMonth();
+
+    // Guard: if quota already met for this calendar month, ask for override
+    if (alreadyDrawnThisMonth >= drawsPerMonth) {
       const thisMonth = history.filter(e => e.time && getEntryMonthKey(e.time) === getCurrentMonthKey());
       const winnersThisMonth = thisMonth.map(e => e.name).join(', ');
       const ok = confirm(
         `This month's draws are complete:\n${winnersThisMonth}\n\n` +
         `(${drawsPerMonth} ${drawsPerMonth === 1 ? 'draw' : 'draws'} per month)\n\n` +
-        `Draw another winner anyway?`
+        `Draw extra anyway?`
       );
       if (!ok) return;
     }
 
+    // How many draws are needed RIGHT NOW (the remaining draws for this calendar month).
+    // If quota already met, the user override case = 1 extra.
+    let drawsRemaining = Math.max(1, drawsPerMonth - alreadyDrawnThisMonth);
+
     // Pool = active names (not skipping)
-    const pool = names.filter(n => !skipping.has(n));
+    let pool = names.filter(n => !skipping.has(n));
 
     if (pool.length === 0) {
       alert('Everyone is skipping this month! At least one person must participate.');
       return;
     }
-    if (pool.length === 1) {
+
+    // Can't draw more winners than there are eligible people
+    drawsRemaining = Math.min(drawsRemaining, pool.length);
+
+    if (pool.length <= drawsRemaining) {
       const ok = confirm(
-        `Only ${pool[0]} is participating — they will win by default. Continue?`
+        `Only ${pool.length} ${pool.length === 1 ? 'person is' : 'people are'} participating, and ` +
+        `${drawsRemaining} ${drawsRemaining === 1 ? 'draw is' : 'draws are'} needed this month.\n\n` +
+        `All eligible people will win this month. Continue?`
       );
       if (!ok) return;
     }
 
+    // Pre-pick all winners for this month
+    const monthWinners = [];
+    const workingPool = [...pool];
+    for (let i = 0; i < drawsRemaining; i++) {
+      const idx = Math.floor(Math.random() * workingPool.length);
+      monthWinners.push(workingPool[idx]);
+      workingPool.splice(idx, 1);
+    }
+
     spinning = true;
     spinBtn.disabled = true;
-    resultLabel.textContent = 'Drawing...';
-    resultName.className = 'result-name spinning';
-
     document.querySelectorAll('.name-chip').forEach(c => c.classList.remove('active'));
 
-    const winner = pool[Math.floor(Math.random() * pool.length)];
-    const duration = 1800;
+    // Animate through winners sequentially
+    drawWinnersSequentially(monthWinners, 0, pool);
+  }
+
+  function drawWinnersSequentially(monthWinners, idx, originalPool) {
+    if (idx >= monthWinners.length) {
+      // All done — final cleanup
+      setTimeout(() => {
+        monthWinners.forEach(w => {
+          const i = names.indexOf(w);
+          if (i !== -1) names.splice(i, 1);
+        });
+        skipping.clear();
+        renderNames();
+        updateStats();
+        renderAmounts();
+        if (names.length === 0) {
+          resultLabel.textContent = '🎉 All months complete — cycle finished!';
+          spinBtn.disabled = true;
+        } else {
+          spinBtn.disabled = false;
+        }
+        saveState();
+        spinning = false;
+      }, 1200);
+      return;
+    }
+
+    const winner = monthWinners[idx];
+    const drawsPerMonth = getDrawsPerMonth();
+    const months = getCycleMonths();
+    const winnerNamesSet = new Set(history.map(e => typeof e === 'string' ? e : e.name).map(n => n.toLowerCase()));
+    names.forEach(n => winnerNamesSet.add(n.toLowerCase()));
+    const totalPeople = winnerNamesSet.size;
+    const monthlyPool = totalPeople * perPerson;
+    const prize = Math.round(monthlyPool / drawsPerMonth);
+
+    const drawNum = history.length + 1;
+    const currentMonth = Math.min(months, Math.ceil(drawNum / drawsPerMonth));
+    const drawIdxInMonth = ((drawNum - 1) % drawsPerMonth) + 1;
+
+    resultLabel.textContent = drawsPerMonth > 1
+      ? `Month ${currentMonth}/${months} · Draw ${drawIdxInMonth}/${drawsPerMonth} · Drawing...`
+      : `Month ${currentMonth} of ${months} · Drawing...`;
+    resultName.className = 'result-name spinning';
+
+    const duration = idx === 0 ? 1800 : 1100; // shorter for follow-up draws
     const start = performance.now();
 
     function tick(now) {
@@ -1950,7 +2028,7 @@
       const progress = elapsed / duration;
       const interval = 50 + Math.pow(progress, 3) * 250;
 
-      const fake = pool[Math.floor(Math.random() * pool.length)];
+      const fake = originalPool[Math.floor(Math.random() * originalPool.length)];
       resultName.textContent = fake;
 
       document.querySelectorAll('.name-chip').forEach(c => {
@@ -1960,24 +2038,13 @@
       if (elapsed < duration) {
         setTimeout(() => requestAnimationFrame(tick), interval);
       } else {
-        // Final reveal
+        // Reveal this winner
         resultName.textContent = winner;
         resultName.className = 'result-name winner';
-        const drawNum = history.length + 1;
-        // Dedup participants for accurate count
-        const winnerNamesSet = new Set(history.map(e => typeof e === 'string' ? e : e.name).map(n => n.toLowerCase()));
-        names.forEach(n => winnerNamesSet.add(n.toLowerCase()));
-        const totalPeople = winnerNamesSet.size;
-        const months = getCycleMonths();
-        const drawsPerMonth = getDrawsPerMonth();
-        const monthlyPool = totalPeople * perPerson;
-        const prize = Math.round(monthlyPool / drawsPerMonth); // Split among winners that month
-        const currentMonth = Math.min(months, Math.ceil(drawNum / drawsPerMonth));
-        const drawIdxInMonth = ((drawNum - 1) % drawsPerMonth) + 1;
-        const monthLabel = drawsPerMonth > 1
+        const finalMonthLabel = drawsPerMonth > 1
           ? `Month ${currentMonth}/${months} · Draw ${drawIdxInMonth}/${drawsPerMonth}`
           : `Month ${currentMonth} of ${months}`;
-        resultLabel.textContent = `${monthLabel} · gets ${formatINR(prize)}`;
+        resultLabel.textContent = `${finalMonthLabel} · gets ${formatINR(prize)}`;
 
         history.unshift({
           name: winner,
@@ -1987,26 +2054,15 @@
         });
         recentlyPicked.add(winner);
         renderHistory();
-        saveState();
 
+        document.querySelectorAll('.name-chip').forEach(c => {
+          c.classList.toggle('active', c.dataset.name === winner);
+        });
+
+        // Pause to let user see this winner, then continue to next
         setTimeout(() => {
-          const idx = names.indexOf(winner);
-          if (idx !== -1) {
-            names.splice(idx, 1);
-          }
-          // Reset opt-outs for next month
-          skipping.clear();
-          renderNames();
-          updateStats();
-          if (names.length === 0) {
-            resultLabel.textContent = '🎉 All months complete — cycle finished!';
-            spinBtn.disabled = true;
-          }
-          saveState();
-        }, 900);
-
-        spinning = false;
-        spinBtn.disabled = false;
+          drawWinnersSequentially(monthWinners, idx + 1, originalPool);
+        }, 1400);
       }
     }
 
